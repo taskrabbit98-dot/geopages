@@ -1,0 +1,20 @@
+{
+  "include": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "app/env.d.ts"],
+  "compilerOptions": {
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "jsx": "react-jsx",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "strict": true,
+    "allowJs": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "~/*": ["./app/*"]
+    }
+  }
+}

@@ -1,0 +1,120 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id          String    @id
+  shop        String
+  state       String
+  isOnline    Boolean   @default(false)
+  scope       String?
+  expires     DateTime?
+  accessToken String
+  userId      BigInt?
+}
+
+model Service {
+  id             String          @id @default(cuid())
+  shop           String
+  name           String
+  slug           String
+  description    String?
+  directoryLinks DirectoryLink[]
+  pages          GeneratedPage[]
+  createdAt      DateTime        @default(now())
+
+  @@unique([shop, slug])
+}
+
+model Location {
+  id        String          @id @default(cuid())
+  shop      String
+  name      String
+  slug      String
+  city      String
+  state     String
+  zip       String?
+  lat       Float?
+  lng       Float?
+  pages     GeneratedPage[]
+  createdAt DateTime        @default(now())
+
+  @@unique([shop, slug])
+}
+
+model DirectoryLink {
+  id         String  @id @default(cuid())
+  service    Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId  String
+  platform   String
+  url        String
+  anchorText String
+}
+
+model GeneratedPage {
+  id              String    @id @default(cuid())
+  shop            String
+  service         Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceId       String
+  location        Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId      String
+  shopifyPageId   String?
+  slug            String
+  title           String
+  metaTitle       String
+  metaDescription String
+  h1              String
+  bodyHtml        String
+  faqJson         String
+  schemaJson      String
+  imageUrl        String?
+  mapEmbedUrl     String?
+  status          String    @default("draft")
+  aiModel         String?
+  qualityScore    Int?
+  generatedAt     DateTime?
+  publishedAt     DateTime?
+  scheduledAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([shop, serviceId, locationId])
+}
+
+model AppSettings {
+  id              String   @id @default(cuid())
+  shop            String   @unique
+  openaiApiKey    String?
+  geminiApiKey    String?
+  googleMapsKey   String?
+  unsplashKey     String?
+  businessName    String?
+  businessPhone   String?
+  businessAddress String?
+  businessWebsite String?
+  defaultAiModel  String   @default("openai")
+  imageStrategy   String   @default("unsplash")
+  pageTemplate    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model GenerationJob {
+  id          String   @id @default(cuid())
+  shop        String
+  serviceId   String
+  locationId  String
+  status      String   @default("pending") // pending | running | done | failed
+  attempts    Int      @default(0)
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
