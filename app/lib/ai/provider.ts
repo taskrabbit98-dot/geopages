@@ -9,6 +9,12 @@ export interface GenerationParams {
   businessPhone: string;
   businessAddress: string;
   writingStyle?: "formal" | "conversational" | "direct";
+  /**
+   * How many times the exact serviceName phrase should appear in the body
+   * content (intro + serviceDetails + localSection). Used to ensure enough
+   * occurrences for inline trust-link anchors. Defaults to 5.
+   */
+  minServiceNameMentions?: number;
 }
 
 export interface FAQItem {
@@ -40,6 +46,7 @@ export function buildSystemPrompt(params: GenerationParams): string {
     direct: "Use a concise, action-oriented tone. Short sentences. Get to the point.",
   };
   const styleNote = styles[params.writingStyle ?? "conversational"];
+  const minMentions = params.minServiceNameMentions ?? 5;
 
   return `You are an expert SEO content writer. ${styleNote}
 
@@ -66,6 +73,11 @@ RULES:
 - Use second person ("you", "your") to address the reader
 - Do not invent statistics or certifications
 - Minimum 600 words total
+- IMPORTANT: Use the EXACT phrase "${params.serviceName}" (verbatim, same wording, no
+  variations like "${params.serviceName.toLowerCase()}-related work" or rephrasings) at
+  least ${minMentions} times distributed across intro, serviceDetails, and localSection
+  body text. Do NOT count occurrences inside headings, FAQ, or CTA. Vary the surrounding
+  sentence each time so it reads naturally.
 - Return as structured JSON matching the schema below
 
 Return ONLY valid JSON, no markdown, no explanation:

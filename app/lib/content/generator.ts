@@ -61,7 +61,14 @@ export function embedTrustLinks(
     let p: Node | null = node.parentNode;
     while (p && (p as Element).tagName) {
       const tag = (p as Element).tagName.toLowerCase();
-      if (tag === "a" || /^h[1-6]$/.test(tag)) return true;
+      if (
+        tag === "a" ||
+        tag === "script" ||
+        tag === "style" ||
+        tag === "noscript" ||
+        /^h[1-6]$/.test(tag)
+      )
+        return true;
       p = p.parentNode;
     }
     return false;

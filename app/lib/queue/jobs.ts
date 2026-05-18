@@ -118,6 +118,7 @@ async function executeGeneration(
     businessPhone: settings.businessPhone || "",
     businessAddress: settings.businessAddress || "",
     writingStyle: writingStyles[styleIndex],
+    minServiceNameMentions: Math.max(resolvedTrustLinks.length, 3),
   });
 
   // Duplicate content check — compare against existing pages for same service
