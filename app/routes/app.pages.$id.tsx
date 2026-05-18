@@ -88,26 +88,31 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   }
 
   if (intent === "publish") {
-    const settings = await prisma.appSettings.findUnique({ where: { shop } });
-    const shopifyPage = await createShopifyPage(admin, {
-      title: page.title,
-      handle: page.slug,
-      bodyHtml: page.bodyHtml,
-      metaTitle: page.metaTitle,
-      metaDescription: page.metaDescription,
-      published: true,
-    });
+    try {
+      const shopifyPage = await createShopifyPage(admin, {
+        title: page.title,
+        handle: page.slug,
+        bodyHtml: page.bodyHtml,
+        metaTitle: page.metaTitle,
+        metaDescription: page.metaDescription,
+        published: true,
+      });
 
-    await prisma.generatedPage.update({
-      where: { id: page.id },
-      data: {
-        shopifyPageId: shopifyPage.id,
-        status: "published",
-        publishedAt: new Date(),
-      },
-    });
+      await prisma.generatedPage.update({
+        where: { id: page.id },
+        data: {
+          shopifyPageId: shopifyPage.id,
+          status: "published",
+          publishedAt: new Date(),
+        },
+      });
 
-    return json({ success: true, message: "Published", url: shopifyPage.onlineStoreUrl });
+      return json({ success: true, message: "Published", url: shopifyPage.onlineStoreUrl });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[publish] failed", message);
+      return json({ error: `Publish failed: ${message}` }, { status: 500 });
+    }
   }
 
   if (intent === "unpublish") {

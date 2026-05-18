@@ -66,14 +66,41 @@ export async function createShopifyPage(
     },
   };
 
-  const response = await admin.graphql(mutation, { variables });
+  let response;
+  try {
+    response = await admin.graphql(mutation, { variables });
+  } catch (err: unknown) {
+    const e = err as { body?: { errors?: unknown }; graphQLErrors?: unknown; message?: string };
+    const gqlErrors = e?.body?.errors ?? e?.graphQLErrors;
+    console.error("[pageCreate] GraphQL request failed", {
+      message: e?.message,
+      gqlErrors: JSON.stringify(gqlErrors, null, 2),
+      variables: JSON.stringify(variables, null, 2),
+    });
+    throw new Error(
+      `Shopify pageCreate failed: ${e?.message ?? "unknown error"}. Details: ${JSON.stringify(gqlErrors)}`
+    );
+  }
+
   const data = (await response.json()) as {
-    data: { pageCreate: { page: ShopifyPage; userErrors: { field: string; message: string }[] } };
+    data?: { pageCreate?: { page: ShopifyPage; userErrors: { field: string; message: string }[] } };
+    errors?: { message: string }[];
   };
+
+  if (data.errors && data.errors.length > 0) {
+    console.error("[pageCreate] GraphQL errors", JSON.stringify(data.errors, null, 2));
+    throw new Error(`Shopify pageCreate GraphQL errors: ${data.errors.map((e) => e.message).join(", ")}`);
+  }
 
   const userErrors = data?.data?.pageCreate?.userErrors;
   if (userErrors && userErrors.length > 0) {
+    console.error("[pageCreate] userErrors", JSON.stringify(userErrors, null, 2));
     throw new Error(userErrors.map((e) => e.message).join(", "));
+  }
+
+  if (!data?.data?.pageCreate?.page) {
+    console.error("[pageCreate] Unexpected response shape", JSON.stringify(data, null, 2));
+    throw new Error("Shopify pageCreate returned no page");
   }
 
   return data.data.pageCreate.page;
