@@ -262,7 +262,12 @@ export default function Dashboard() {
                   <Text variant="headingMd" as="h2">Sitemap</Text>
                   <Text as="p" tone="subdued">Submit this URL to Google Search Console after publishing pages.</Text>
                   <Text as="p" variant="bodySm" fontWeight="bold">{sitemapUrl}</Text>
-                  <Button url={sitemapUrl} external size="slim">Open Sitemap</Button>
+                  <Button
+                    onClick={() => window.open(sitemapUrl, "_blank", "noopener,noreferrer")}
+                    size="slim"
+                  >
+                    Open Sitemap
+                  </Button>
                 </BlockStack>
               </Card>
               <Card>

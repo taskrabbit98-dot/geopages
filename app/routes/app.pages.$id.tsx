@@ -205,7 +205,14 @@ export default function PageEditor() {
             }
           },
         },
-        ...(shopifyUrl ? [{ content: "View Live Page", url: shopifyUrl, external: true }] : []),
+        ...(shopifyUrl
+          ? [
+              {
+                content: "View Live Page",
+                onAction: () => window.open(shopifyUrl, "_blank", "noopener,noreferrer"),
+              },
+            ]
+          : []),
       ]}
     >
       <BlockStack gap="500">
@@ -340,7 +347,12 @@ export default function PageEditor() {
                     </Text>
                   )}
                   {shopifyUrl && (
-                    <Button url={shopifyUrl} external size="slim">View Live Page</Button>
+                    <Button
+                      onClick={() => window.open(shopifyUrl, "_blank", "noopener,noreferrer")}
+                      size="slim"
+                    >
+                      View Live Page
+                    </Button>
                   )}
                 </BlockStack>
               </Card>
