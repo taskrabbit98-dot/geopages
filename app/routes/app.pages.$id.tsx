@@ -107,7 +107,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         },
       });
 
-      return json({ success: true, message: "Published", url: shopifyPage.onlineStoreUrl });
+      const liveUrl = `https://${shop}/pages/${shopifyPage.handle}`;
+      return json({ success: true, message: "Published", url: liveUrl });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       console.error("[publish] failed", message);

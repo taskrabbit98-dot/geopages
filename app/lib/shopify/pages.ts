@@ -15,7 +15,7 @@ interface ShopifyPage {
   id: string;
   handle: string;
   title: string;
-  onlineStoreUrl: string | null;
+  onlineStoreUrl?: string | null;
 }
 
 /**
@@ -33,7 +33,6 @@ export async function createShopifyPage(
           id
           handle
           title
-          onlineStoreUrl
         }
         userErrors {
           field
