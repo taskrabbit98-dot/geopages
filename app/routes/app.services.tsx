@@ -78,10 +78,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const serviceId = formData.get("serviceId") as string;
     const platform = (formData.get("platform") as string).trim();
     const url = (formData.get("url") as string).trim();
-    const anchorText = (formData.get("anchorText") as string).trim();
 
-    if (!platform || !url || !anchorText)
-      return json({ error: "All directory link fields are required" }, { status: 400 });
+    if (!platform || !url)
+      return json({ error: "Platform name and URL are required" }, { status: 400 });
+
+    const anchorText = `Find us on ${platform}`;
 
     await prisma.directoryLink.create({ data: { serviceId, platform, url, anchorText } });
     return json({ success: true });
@@ -115,7 +116,7 @@ export default function Services() {
   const [expandedServiceId, setExpandedServiceId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
-  const [linkForm, setLinkForm] = useState({ platform: "", url: "", anchorText: "" });
+  const [linkForm, setLinkForm] = useState({ platform: "", url: "" });
 
   const handleCreate = () => {
     if (!newName.trim()) return;
@@ -129,12 +130,12 @@ export default function Services() {
   };
 
   const handleAddLink = (serviceId: string) => {
-    if (!linkForm.platform || !linkForm.url || !linkForm.anchorText) return;
+    if (!linkForm.platform || !linkForm.url) return;
     fetcher.submit(
       { intent: "add-link", serviceId, ...linkForm },
       { method: "POST" }
     );
-    setLinkForm({ platform: "", url: "", anchorText: "" });
+    setLinkForm({ platform: "", url: "" });
   };
 
   return (
@@ -222,31 +223,26 @@ export default function Services() {
                       <FormLayout>
                         <FormLayout.Group>
                           <TextField
-                            label="Where (the website name)"
+                            label="Where"
                             value={linkForm.platform}
                             onChange={(v) => setLinkForm((f) => ({ ...f, platform: v }))}
                             autoComplete="off"
                             placeholder="Yelp"
-                            helpText="e.g. Yelp, Google Business, Facebook, BBB"
+                            helpText="The website name (e.g. Yelp, Google Business, BBB)"
                           />
                           <TextField
-                            label="Your profile URL on that site"
+                            label="Your profile URL"
                             value={linkForm.url}
                             onChange={(v) => setLinkForm((f) => ({ ...f, url: v }))}
                             autoComplete="off"
                             placeholder="https://yelp.com/biz/your-business"
-                            helpText="Paste the full link to your business listing"
-                          />
-                          <TextField
-                            label="Link text shown on page"
-                            value={linkForm.anchorText}
-                            onChange={(v) => setLinkForm((f) => ({ ...f, anchorText: v }))}
-                            autoComplete="off"
-                            placeholder="Find us on Yelp"
-                            helpText="What visitors see and click"
+                            helpText="Full link to your business listing on that site"
                           />
                         </FormLayout.Group>
                       </FormLayout>
+                      <Text as="p" tone="subdued" variant="bodySm">
+                        Link text will display as <strong>"Find us on {linkForm.platform || "<website>"}"</strong>.
+                      </Text>
                       <Button
                         size="slim"
                         onClick={() => handleAddLink(service.id)}
@@ -265,7 +261,6 @@ export default function Services() {
                               setLinkForm((f) => ({
                                 ...f,
                                 platform: dir.platform,
-                                anchorText: dir.anchor,
                               }))
                             }
                           >
