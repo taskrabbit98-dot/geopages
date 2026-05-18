@@ -169,7 +169,7 @@ export default function Services() {
                         size="slim"
                         onClick={() => setExpandedServiceId(isExpanded ? null : service.id)}
                       >
-                        {isExpanded ? "Hide Links" : `Directory Links (${service.directoryLinks.length})`}
+                        {isExpanded ? "Hide" : `Trust Links (${service.directoryLinks.length})`}
                       </Button>
                       <Button
                         size="slim"
@@ -183,18 +183,19 @@ export default function Services() {
                     </InlineStack>
                   </InlineStack>
 
-                  {service.directoryLinks.length < 5 && (
-                    <Banner tone="warning">
-                      <p>
-                        This service has only {service.directoryLinks.length} directory link(s). Add at least 5 for optimal SEO.
-                      </p>
-                    </Banner>
-                  )}
-
                   {isExpanded && (
                     <BlockStack gap="300">
                       <Divider />
-                      <Text variant="headingMd" as="h3">Directory Links</Text>
+                      <Text variant="headingMd" as="h3">Trust Links (optional)</Text>
+
+                      <Banner tone="info">
+                        <p>
+                          Trust links are profile URLs of YOUR business on third-party sites
+                          (Yelp, Google Business, BBB, Facebook). They appear as a "Find us on the web"
+                          section on every generated page, signaling to visitors and search engines
+                          that you're a real business. <strong>Skip this if you don't have any yet — pages still work fine.</strong>
+                        </p>
+                      </Banner>
 
                       {service.directoryLinks.map((link) => (
                         <InlineStack key={link.id} align="space-between">
@@ -217,30 +218,32 @@ export default function Services() {
                         </InlineStack>
                       ))}
 
-                      <Text variant="headingSm" as="h4">Add Directory Link</Text>
+                      <Text variant="headingSm" as="h4">Add a trust link</Text>
                       <FormLayout>
                         <FormLayout.Group>
                           <TextField
-                            label="Platform"
+                            label="Where (the website name)"
                             value={linkForm.platform}
                             onChange={(v) => setLinkForm((f) => ({ ...f, platform: v }))}
                             autoComplete="off"
-                            placeholder="e.g., Yelp"
-                            helpText="Suggestions: Yelp, Manta, BBB, Angi, HomeAdvisor, Thumbtack, YellowPages"
+                            placeholder="Yelp"
+                            helpText="e.g. Yelp, Google Business, Facebook, BBB"
                           />
                           <TextField
-                            label="URL"
+                            label="Your profile URL on that site"
                             value={linkForm.url}
                             onChange={(v) => setLinkForm((f) => ({ ...f, url: v }))}
                             autoComplete="off"
-                            placeholder="https://yelp.com/biz/..."
+                            placeholder="https://yelp.com/biz/your-business"
+                            helpText="Paste the full link to your business listing"
                           />
                           <TextField
-                            label="Anchor Text"
+                            label="Link text shown on page"
                             value={linkForm.anchorText}
                             onChange={(v) => setLinkForm((f) => ({ ...f, anchorText: v }))}
                             autoComplete="off"
                             placeholder="Find us on Yelp"
+                            helpText="What visitors see and click"
                           />
                         </FormLayout.Group>
                       </FormLayout>

@@ -212,16 +212,15 @@ export default function BulkOperations() {
             <Card>
               <BlockStack gap="400">
                 <Text variant="headingMd" as="h2">
-                  Bulk Regenerate Section
+                  Refresh content on existing pages
                 </Text>
                 <Text as="p" tone="subdued">
-                  Re-runs the AI to rewrite one section across many pages. Useful when you want a fresh
-                  FAQ, intro, or meta tags without touching the whole page. Edits go live immediately
-                  (no Shopify publish needed).
+                  Rewrite one section (like the FAQ or intro) across many pages at once.
+                  Changes go live immediately.
                 </Text>
 
                 <Select
-                  label="Pages to update"
+                  label="Which pages?"
                   value={serviceId}
                   onChange={setServiceId}
                   options={[
@@ -231,28 +230,25 @@ export default function BulkOperations() {
                 />
 
                 <Select
-                  label="Section to regenerate"
+                  label="Which part of the page?"
                   value={section}
                   onChange={setSection}
                   options={[
-                    { label: "FAQ (cheapest, most useful)", value: "faq" },
+                    { label: "FAQ section", value: "faq" },
                     { label: "Intro paragraphs", value: "intro" },
                     { label: "Call-to-action", value: "cta" },
-                    { label: "Meta title + description", value: "meta" },
+                    { label: "SEO title + description", value: "meta" },
                   ]}
                 />
 
-                <InlineStack align="space-between">
-                  <Text as="span" tone="subdued" variant="bodySm">
-                    ⚠️ Each page = 1 AI call. Bulk regen across 500 pages costs ~$0.50–$5 depending on model.
-                  </Text>
+                <InlineStack align="end">
                   <Button
                     variant="primary"
                     onClick={handleRegenerate}
                     loading={isBusy}
                     disabled={!hasApiKey}
                   >
-                    Regenerate
+                    Refresh content
                   </Button>
                 </InlineStack>
               </BlockStack>
@@ -261,15 +257,14 @@ export default function BulkOperations() {
             <Card>
               <BlockStack gap="400">
                 <Text variant="headingMd" as="h2">
-                  Bulk Delete Pages
+                  Delete pages in bulk
                 </Text>
                 <Text as="p" tone="subdued">
-                  Permanently removes pages from the database. Their public URLs will 404.
-                  This cannot be undone.
+                  Permanently remove pages. This cannot be undone.
                 </Text>
 
                 <Select
-                  label="Service filter"
+                  label="Which service?"
                   value={deleteServiceId}
                   onChange={setDeleteServiceId}
                   options={[
@@ -279,20 +274,20 @@ export default function BulkOperations() {
                 />
 
                 <Select
-                  label="Status filter"
+                  label="Which pages?"
                   value={deleteStatus}
                   onChange={setDeleteStatus}
                   options={[
-                    { label: "Only archived (safest)", value: "archived" },
+                    { label: "Only archived pages (safest)", value: "archived" },
                     { label: "Only drafts", value: "draft" },
-                    { label: "Only published", value: "published" },
-                    { label: "Any status (most destructive)", value: "all" },
+                    { label: "Only published pages", value: "published" },
+                    { label: "All pages (most destructive)", value: "all" },
                   ]}
                 />
 
                 <InlineStack align="end">
                   <Button variant="primary" tone="critical" onClick={handleBulkDelete} loading={isBusy}>
-                    Delete matching pages
+                    Delete pages
                   </Button>
                 </InlineStack>
               </BlockStack>
@@ -303,7 +298,7 @@ export default function BulkOperations() {
             <Card>
               <BlockStack gap="300">
                 <Text variant="headingMd" as="h2">
-                  Page Stats
+                  Page counts
                 </Text>
                 <InlineStack gap="200">
                   <Badge tone="info">{`${draftCount} drafts`}</Badge>
@@ -311,8 +306,7 @@ export default function BulkOperations() {
                 </InlineStack>
                 <Divider />
                 <Text as="p" tone="subdued" variant="bodySm">
-                  Pages are served via Shopify App Proxy at <code>/apps/pseo/&lt;slug&gt;</code>.
-                  Edits in the page editor go live immediately — no publish step required after.
+                  Page edits from the editor go live right away. There's no extra publish step.
                 </Text>
               </BlockStack>
             </Card>

@@ -258,7 +258,7 @@ export default function Generate() {
                 <InlineStack gap="200">
                   <Button size="slim" onClick={selectAll}>Select All</Button>
                   <Button size="slim" onClick={clearSelection} disabled={selected.size === 0}>Clear</Button>
-                  <Text as="span" tone="subdued">{selected.size} selected · ~${estimatedCost} API cost</Text>
+                  <Text as="span" tone="subdued">{selected.size} selected</Text>
                 </InlineStack>
                 <InlineStack gap="200">
                   <Button
