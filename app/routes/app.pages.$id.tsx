@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import {
   Page,
@@ -107,6 +107,11 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return json({ success: true, message: "Archived" });
   }
 
+  if (intent === "delete") {
+    await prisma.generatedPage.delete({ where: { id: page.id } });
+    return redirect("/app/generate");
+  }
+
   if (intent === "regenerate-section") {
     const section = formData.get("section") as string;
     const settings = await prisma.appSettings.findUnique({ where: { shop } });
@@ -184,6 +189,19 @@ export default function PageEditor() {
           ? [{ content: "Unpublish", onAction: () => fetcher.submit({ intent: "unpublish" }, { method: "POST" }) }]
           : []),
         { content: "Archive", onAction: () => fetcher.submit({ intent: "archive" }, { method: "POST" }) },
+        {
+          content: "Delete",
+          destructive: true,
+          onAction: () => {
+            if (
+              window.confirm(
+                `Delete "${page.title}"? This permanently removes the page from the database and its public URL will 404. This cannot be undone.`,
+              )
+            ) {
+              fetcher.submit({ intent: "delete" }, { method: "POST" });
+            }
+          },
+        },
         ...(shopifyUrl ? [{ content: "View Live Page", url: shopifyUrl, external: true }] : []),
       ]}
     >

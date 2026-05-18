@@ -126,6 +126,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return json({ success: true, updated, failed, failures, total: pages.length });
   }
 
+  if (intent === "delete-pages") {
+    const serviceId = formData.get("serviceId") as string;
+    const statusFilter = formData.get("statusFilter") as string;
+
+    const where: { shop: string; serviceId?: string; status?: string } = { shop };
+    if (serviceId !== "all") where.serviceId = serviceId;
+    if (statusFilter !== "all") where.status = statusFilter;
+
+    const result = await prisma.generatedPage.deleteMany({ where });
+    return json({ success: true, deleted: result.count });
+  }
+
   return json({ error: "Unknown intent" }, { status: 400 });
 };
 
@@ -135,15 +147,34 @@ export default function BulkOperations() {
 
   const [serviceId, setServiceId] = useState<string>("all");
   const [section, setSection] = useState<string>("faq");
+  const [deleteServiceId, setDeleteServiceId] = useState<string>("all");
+  const [deleteStatus, setDeleteStatus] = useState<string>("archived");
 
   const isBusy = fetcher.state !== "idle";
   const data = fetcher.data as
     | { success: boolean; updated: number; failed: number; failures: string[]; total: number }
+    | { success: boolean; deleted: number }
     | { error: string }
     | undefined;
 
   const handleRegenerate = () => {
     fetcher.submit({ intent: "regenerate-section", serviceId, section }, { method: "POST" });
+  };
+
+  const handleBulkDelete = () => {
+    const serviceLabel =
+      deleteServiceId === "all" ? "ALL services" : services.find((s) => s.id === deleteServiceId)?.name;
+    const statusLabel = deleteStatus === "all" ? "any status" : deleteStatus;
+    if (
+      window.confirm(
+        `Permanently delete pages where service = "${serviceLabel}" and status = "${statusLabel}"? This cannot be undone.`,
+      )
+    ) {
+      fetcher.submit(
+        { intent: "delete-pages", serviceId: deleteServiceId, statusFilter: deleteStatus },
+        { method: "POST" },
+      );
+    }
   };
 
   return (
@@ -168,6 +199,10 @@ export default function BulkOperations() {
               </ul>
             )}
           </Banner>
+        )}
+
+        {data && "deleted" in data && (
+          <Banner title={`Deleted ${data.deleted} page(s)`} tone="success" />
         )}
 
         {data && "error" in data && <Banner tone="critical">{data.error}</Banner>}
@@ -218,6 +253,46 @@ export default function BulkOperations() {
                     disabled={!hasApiKey}
                   >
                     Regenerate
+                  </Button>
+                </InlineStack>
+              </BlockStack>
+            </Card>
+
+            <Card>
+              <BlockStack gap="400">
+                <Text variant="headingMd" as="h2">
+                  Bulk Delete Pages
+                </Text>
+                <Text as="p" tone="subdued">
+                  Permanently removes pages from the database. Their public URLs will 404.
+                  This cannot be undone.
+                </Text>
+
+                <Select
+                  label="Service filter"
+                  value={deleteServiceId}
+                  onChange={setDeleteServiceId}
+                  options={[
+                    { label: "All services", value: "all" },
+                    ...services.map((s) => ({ label: s.name, value: s.id })),
+                  ]}
+                />
+
+                <Select
+                  label="Status filter"
+                  value={deleteStatus}
+                  onChange={setDeleteStatus}
+                  options={[
+                    { label: "Only archived (safest)", value: "archived" },
+                    { label: "Only drafts", value: "draft" },
+                    { label: "Only published", value: "published" },
+                    { label: "Any status (most destructive)", value: "all" },
+                  ]}
+                />
+
+                <InlineStack align="end">
+                  <Button variant="primary" tone="critical" onClick={handleBulkDelete} loading={isBusy}>
+                    Delete matching pages
                   </Button>
                 </InlineStack>
               </BlockStack>
