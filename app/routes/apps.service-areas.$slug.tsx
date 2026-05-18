@@ -4,7 +4,7 @@ import prisma from "~/db.server";
 
 /**
  * Public-facing page served via Shopify App Proxy at:
- *   https://<shop>.myshopify.com/apps/services/{slug}
+ *   https://<shop>.myshopify.com/apps/service-areas/{slug}
  *
  * Response is application/liquid so Shopify wraps with the store theme.
  * If the page isn't found or isn't published, returns a 404 page that
@@ -35,7 +35,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const liquid = `{% layout 'theme' %}
 <div class="pseo-app-page page-width" style="max-width: 1100px; margin: 0 auto; padding: 40px 20px;">
   <meta name="description" content="${escapeAttr(page.metaDescription)}" data-pseo-meta />
-  <link rel="canonical" href="https://${shop}/apps/services/${page.slug}" />
+  <link rel="canonical" href="https://${shop}/apps/service-areas/${page.slug}" />
 ${safeBody}
 </div>`;
 

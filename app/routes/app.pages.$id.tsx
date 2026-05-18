@@ -87,7 +87,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       where: { id: page.id },
       data: { status: "published", publishedAt: new Date() },
     });
-    const liveUrl = `https://${shop}/apps/services/${page.slug}`;
+    const liveUrl = `https://${shop}/apps/service-areas/${page.slug}`;
     return json({ success: true, message: "Published", url: liveUrl });
   }
 
@@ -172,7 +172,7 @@ export default function PageEditor() {
   const [bodyHtml, setBodyHtml] = useState(page.bodyHtml);
 
   const isBusy = fetcher.state !== "idle";
-  const shopifyUrl = page.status === "published" ? `${shopUrl}/apps/services/${page.slug}` : null;
+  const shopifyUrl = page.status === "published" ? `${shopUrl}/apps/service-areas/${page.slug}` : null;
 
   return (
     <Page

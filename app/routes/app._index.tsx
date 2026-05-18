@@ -81,7 +81,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     published,
     recentJobs,
     hasSettings: !!settings?.businessName,
-    sitemapUrl: `https://${shop}/apps/services/sitemap.xml`,
+    sitemapUrl: `https://${shop}/apps/service-areas/sitemap.xml`,
   });
 };
 

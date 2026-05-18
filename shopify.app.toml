@@ -21,8 +21,8 @@ redirect_urls = [
 api_version = "2024-07"
 
 [app_proxy]
-url = "https://shopify-pseo-app.fly.dev/apps/services"
-subpath = "services"
+url = "https://shopify-pseo-app.fly.dev/apps/service-areas"
+subpath = "service-areas"
 prefix = "apps"
 
 [pos]
