@@ -18,6 +18,7 @@ import {
 import { authenticate } from "~/shopify.server";
 import prisma from "~/db.server";
 import { enqueueJob } from "~/lib/queue/jobs";
+import { createShopifyPage } from "~/lib/shopify/pages";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -62,11 +63,51 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
 
   const formData = await request.formData();
   const intent = formData.get("intent");
+
+  if (intent === "publish-all-drafts") {
+    const drafts = await prisma.generatedPage.findMany({
+      where: { shop, status: "draft" },
+    });
+
+    let published = 0;
+    let failed = 0;
+    const failures: string[] = [];
+
+    for (const page of drafts) {
+      try {
+        const shopifyPage = await createShopifyPage(admin, {
+          title: page.title,
+          handle: page.slug,
+          bodyHtml: page.bodyHtml,
+          metaTitle: page.metaTitle,
+          metaDescription: page.metaDescription,
+          published: true,
+        });
+
+        await prisma.generatedPage.update({
+          where: { id: page.id },
+          data: {
+            shopifyPageId: shopifyPage.id,
+            status: "published",
+            publishedAt: new Date(),
+          },
+        });
+        published++;
+      } catch (err) {
+        failed++;
+        const msg = err instanceof Error ? err.message : String(err);
+        failures.push(`${page.slug}: ${msg}`);
+        console.error(`[publish-all] failed for ${page.slug}`, msg);
+      }
+    }
+
+    return json({ success: true, published, failed, failures });
+  }
 
   if (intent === "generate-all") {
     // Find all service+location combos without a generated page
@@ -113,7 +154,25 @@ export default function Dashboard() {
   const isGenerating = fetcher.state !== "idle";
 
   return (
-    <Page title="Dashboard" primaryAction={{ content: "Generate All Missing Pages", onAction: () => fetcher.submit({ intent: "generate-all" }, { method: "POST" }), loading: isGenerating }}>
+    <Page
+      title="Dashboard"
+      primaryAction={{
+        content: "Generate All Missing Pages",
+        onAction: () => fetcher.submit({ intent: "generate-all" }, { method: "POST" }),
+        loading: isGenerating,
+      }}
+      secondaryActions={
+        draft > 0
+          ? [
+              {
+                content: `Publish All ${draft} Drafts`,
+                onAction: () => fetcher.submit({ intent: "publish-all-drafts" }, { method: "POST" }),
+                loading: isGenerating,
+              },
+            ]
+          : []
+      }
+    >
       <BlockStack gap="500">
         {!hasSettings && (
           <Banner title="Complete your setup" tone="warning" action={{ content: "Go to Settings", url: "/app/settings" }}>
@@ -123,6 +182,26 @@ export default function Dashboard() {
 
         {fetcher.data && 'queued' in fetcher.data && fetcher.data.queued != null && (
           <Banner title={`Queued ${fetcher.data.queued} generation jobs`} tone="success" />
+        )}
+
+        {fetcher.data && 'published' in fetcher.data && (
+          <Banner
+            title={`Published ${(fetcher.data as { published: number }).published} pages${
+              (fetcher.data as { failed: number }).failed > 0
+                ? `, ${(fetcher.data as { failed: number }).failed} failed`
+                : ""
+            }`}
+            tone={(fetcher.data as { failed: number }).failed > 0 ? "warning" : "success"}
+          >
+            {(fetcher.data as { failures?: string[] }).failures &&
+              (fetcher.data as { failures: string[] }).failures.length > 0 && (
+                <ul style={{ marginTop: 8, fontSize: 12 }}>
+                  {(fetcher.data as { failures: string[] }).failures.slice(0, 5).map((f, i) => (
+                    <li key={i}>{f}</li>
+                  ))}
+                </ul>
+              )}
+          </Banner>
         )}
 
         <InlineGrid columns={4} gap="400">
