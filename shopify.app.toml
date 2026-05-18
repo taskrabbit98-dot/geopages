@@ -8,7 +8,7 @@ automatically_update_urls_on_dev = true
 dev_store_url = "dupe-test-store.myshopify.com"
 
 [access_scopes]
-scopes = "write_content,read_content,write_metaobjects,read_metaobjects,read_themes,write_themes"
+scopes = "write_content,read_content,write_metaobjects,read_metaobjects,read_themes,write_themes,read_online_store_navigation,write_online_store_navigation"
 
 [auth]
 redirect_urls = [

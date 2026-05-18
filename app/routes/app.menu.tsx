@@ -30,30 +30,42 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
 
-  const resp = await admin.graphql(`
-    query {
-      menus(first: 30) {
-        edges {
-          node {
-            id
-            handle
-            title
-            items { id }
+  let menus: ShopifyMenu[] = [];
+  let scopeError = false;
+
+  try {
+    const resp = await admin.graphql(`
+      query {
+        menus(first: 30) {
+          edges {
+            node {
+              id
+              handle
+              title
+              items { id }
+            }
           }
         }
       }
-    }
-  `);
-  const data = (await resp.json()) as {
-    data: { menus: { edges: { node: { id: string; handle: string; title: string; items: { id: string }[] } }[] } };
-  };
+    `);
+    const data = (await resp.json()) as {
+      data?: { menus?: { edges: { node: { id: string; handle: string; title: string; items: { id: string }[] } }[] } };
+    };
 
-  const menus: ShopifyMenu[] = data.data.menus.edges.map((e) => ({
-    id: e.node.id,
-    handle: e.node.handle,
-    title: e.node.title,
-    itemCount: e.node.items.length,
-  }));
+    menus = (data.data?.menus?.edges ?? []).map((e) => ({
+      id: e.node.id,
+      handle: e.node.handle,
+      title: e.node.title,
+      itemCount: e.node.items.length,
+    }));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.toLowerCase().includes("access denied") || msg.toLowerCase().includes("menus field")) {
+      scopeError = true;
+    } else {
+      throw err;
+    }
+  }
 
   const [serviceCount, locationCount, publishedCount] = await Promise.all([
     prisma.service.count({ where: { shop } }),
@@ -61,7 +73,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     prisma.generatedPage.count({ where: { shop, status: "published" } }),
   ]);
 
-  return json({ menus, shop, serviceCount, locationCount, publishedCount });
+  return json({ menus, shop, serviceCount, locationCount, publishedCount, scopeError });
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -261,7 +273,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function MenuPage() {
-  const { menus, serviceCount, locationCount, publishedCount } = useLoaderData<typeof loader>();
+  const { menus, serviceCount, locationCount, publishedCount, scopeError } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
 
   const [menuId, setMenuId] = useState(menus[0]?.id ?? "");
@@ -290,6 +302,26 @@ export default function MenuPage() {
   return (
     <Page title="Add pages to your storefront menu">
       <BlockStack gap="500">
+        {scopeError && (
+          <Banner tone="critical" title="Reinstall the app to grant menu permissions">
+            <p>
+              This feature needs <code>read_online_store_navigation</code> and{" "}
+              <code>write_online_store_navigation</code> permissions, which weren't granted when the app
+              was installed. To enable it:
+            </p>
+            <ol style={{ marginLeft: 20, marginTop: 8 }}>
+              <li>Open this URL in a new tab (replace YOURSTORE):</li>
+              <li>
+                <code>
+                  https://shopify-pseo-app.fly.dev/auth/login?shop=YOURSTORE.myshopify.com
+                </code>
+              </li>
+              <li>Approve the new permissions on the Shopify install screen</li>
+              <li>Come back to this page</li>
+            </ol>
+          </Banner>
+        )}
+
         {publishedCount === 0 && (
           <Banner tone="warning">
             <p>
