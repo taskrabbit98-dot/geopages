@@ -20,7 +20,7 @@ interface AssembleParams {
   slug: string;
   imageUrl?: string | null;
   mapEmbedUrl?: string | null;
-  directoryLinks: Pick<DirectoryLink, "url" | "anchorText" | "platform">[];
+  directoryLinks: Pick<DirectoryLink, "url" | "platform">[];
   relatedPages: { title: string; slug: string }[];
 }
 

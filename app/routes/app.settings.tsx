@@ -18,18 +18,50 @@ import { useState } from "react";
 
 import { authenticate } from "~/shopify.server";
 import prisma from "~/db.server";
+import { TRUST_LINK_PRESETS } from "~/lib/content/trustLinks";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
-  const settings = await prisma.appSettings.findUnique({ where: { shop } });
-  return json({ settings, shop });
+  const [settings, trustLinks] = await Promise.all([
+    prisma.appSettings.findUnique({ where: { shop } }),
+    prisma.trustLinkTemplate.findMany({ where: { shop }, orderBy: { sortOrder: "asc" } }),
+  ]);
+  return json({ settings, trustLinks, shop });
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
   const formData = await request.formData();
+  const intent = formData.get("intent") as string | null;
+
+  if (intent === "add-trust-link") {
+    const platform = (formData.get("platform") as string).trim();
+    const urlTemplate = (formData.get("urlTemplate") as string).trim();
+    if (!platform || !urlTemplate) {
+      return json({ error: "Platform and URL template are required" }, { status: 400 });
+    }
+    await prisma.trustLinkTemplate.create({
+      data: { shop, platform, urlTemplate },
+    });
+    return json({ success: true });
+  }
+
+  if (intent === "delete-trust-link") {
+    const id = formData.get("id") as string;
+    await prisma.trustLinkTemplate.delete({ where: { id } });
+    return json({ success: true });
+  }
+
+  if (intent === "add-trust-preset") {
+    const platform = (formData.get("platform") as string).trim();
+    const urlTemplate = (formData.get("urlTemplate") as string).trim();
+    await prisma.trustLinkTemplate.create({
+      data: { shop, platform, urlTemplate },
+    });
+    return json({ success: true });
+  }
 
   const data = {
     businessName: (formData.get("businessName") as string).trim(),
@@ -54,8 +86,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Settings() {
-  const { settings } = useLoaderData<typeof loader>();
+  const { settings, trustLinks } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
+  const trustFetcher = useFetcher<typeof action>();
 
   const [form, setForm] = useState({
     businessName: settings?.businessName ?? "",
@@ -70,10 +103,32 @@ export default function Settings() {
     unsplashKey: settings?.unsplashKey ?? "",
   });
 
+  const [trustForm, setTrustForm] = useState({ platform: "", urlTemplate: "" });
+
   const set = (key: string) => (v: string) => setForm((f) => ({ ...f, [key]: v }));
 
   const handleSave = () => {
     fetcher.submit(form, { method: "POST" });
+  };
+
+  const handleAddTrustLink = () => {
+    if (!trustForm.platform || !trustForm.urlTemplate) return;
+    trustFetcher.submit(
+      { intent: "add-trust-link", platform: trustForm.platform, urlTemplate: trustForm.urlTemplate },
+      { method: "POST" },
+    );
+    setTrustForm({ platform: "", urlTemplate: "" });
+  };
+
+  const handleAddPreset = (preset: { platform: string; urlTemplate: string }) => {
+    trustFetcher.submit(
+      { intent: "add-trust-preset", platform: preset.platform, urlTemplate: preset.urlTemplate },
+      { method: "POST" },
+    );
+  };
+
+  const handleDeleteTrustLink = (id: string) => {
+    trustFetcher.submit({ intent: "delete-trust-link", id }, { method: "POST" });
   };
 
   return (
@@ -102,6 +157,90 @@ export default function Settings() {
                     </FormLayout.Group>
                     <TextField label="Address" value={form.businessAddress} onChange={set("businessAddress")} autoComplete="street-address" placeholder="123 Main St, Miami, FL" />
                   </FormLayout>
+                </BlockStack>
+              </Card>
+
+              {/* Trust Links */}
+              <Card>
+                <BlockStack gap="400">
+                  <a id="trust-links" />
+                  <Text variant="headingMd" as="h2">Trust Links</Text>
+                  <Text as="p" tone="subdued">
+                    URL templates for third-party directory <strong>search pages</strong>. When a page is
+                    generated for "Roof Repair in Biloxi, MS", the placeholders in each template get
+                    filled in, and the resulting URLs are embedded inline as anchors on the service
+                    name throughout the article.
+                  </Text>
+                  <Text as="p" tone="subdued" variant="bodySm">
+                    Placeholders: <code>{"{service}"}</code> <code>{"{city}"}</code>{" "}
+                    <code>{"{state}"}</code> <code>{"{zip}"}</code> <code>{"{service-slug}"}</code>{" "}
+                    <code>{"{city-slug}"}</code> <code>{"{state-slug}"}</code>
+                  </Text>
+
+                  {trustLinks.length > 0 && (
+                    <BlockStack gap="200">
+                      <Text variant="headingSm" as="h3">Active templates ({trustLinks.length})</Text>
+                      {trustLinks.map((t) => (
+                        <InlineStack key={t.id} align="space-between" gap="200" blockAlign="center">
+                          <BlockStack gap="100">
+                            <Text as="span" fontWeight="bold">{t.platform}</Text>
+                            <Text as="span" tone="subdued" variant="bodySm">
+                              <code>{t.urlTemplate}</code>
+                            </Text>
+                          </BlockStack>
+                          <Button
+                            size="slim"
+                            tone="critical"
+                            onClick={() => handleDeleteTrustLink(t.id)}
+                          >
+                            Remove
+                          </Button>
+                        </InlineStack>
+                      ))}
+                    </BlockStack>
+                  )}
+
+                  <Text variant="headingSm" as="h3">Quick add (presets)</Text>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {TRUST_LINK_PRESETS.map((p) => {
+                      const alreadyAdded = trustLinks.some((t) => t.platform === p.platform);
+                      return (
+                        <Button
+                          key={p.platform}
+                          size="slim"
+                          disabled={alreadyAdded}
+                          onClick={() => handleAddPreset(p)}
+                        >
+                          {alreadyAdded ? `✓ ${p.platform}` : `+ ${p.platform}`}
+                        </Button>
+                      );
+                    })}
+                  </div>
+
+                  <Text variant="headingSm" as="h3">Or add a custom template</Text>
+                  <FormLayout>
+                    <FormLayout.Group>
+                      <TextField
+                        label="Platform name"
+                        value={trustForm.platform}
+                        onChange={(v) => setTrustForm((f) => ({ ...f, platform: v }))}
+                        autoComplete="off"
+                        placeholder="Local Chamber"
+                      />
+                      <TextField
+                        label="URL template (with placeholders)"
+                        value={trustForm.urlTemplate}
+                        onChange={(v) => setTrustForm((f) => ({ ...f, urlTemplate: v }))}
+                        autoComplete="off"
+                        placeholder="https://example.com/find?q={service}&city={city}"
+                      />
+                    </FormLayout.Group>
+                  </FormLayout>
+                  <InlineStack align="end">
+                    <Button onClick={handleAddTrustLink} loading={trustFetcher.state !== "idle"}>
+                      Add custom template
+                    </Button>
+                  </InlineStack>
                 </BlockStack>
               </Card>
 

@@ -20,6 +20,7 @@ import { authenticate } from "~/shopify.server";
 import prisma from "~/db.server";
 import { createAIProvider } from "~/lib/ai";
 import { reapplyTrustLinks } from "~/lib/content/generator";
+import { resolveTemplate } from "~/lib/content/trustLinks";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -130,21 +131,33 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (intent === "refresh-trust-links") {
     const serviceFilter = formData.get("serviceId") as string;
 
-    const pages = await prisma.generatedPage.findMany({
-      where: {
-        shop,
-        ...(serviceFilter !== "all" ? { serviceId: serviceFilter } : {}),
-      },
-      include: { service: { include: { directoryLinks: true } } },
-    });
+    const [pages, templates] = await Promise.all([
+      prisma.generatedPage.findMany({
+        where: {
+          shop,
+          ...(serviceFilter !== "all" ? { serviceId: serviceFilter } : {}),
+        },
+        include: { service: true, location: true },
+      }),
+      prisma.trustLinkTemplate.findMany({
+        where: { shop },
+        orderBy: { sortOrder: "asc" },
+      }),
+    ]);
 
     let updated = 0;
     for (const page of pages) {
-      const newBody = reapplyTrustLinks(
-        page.bodyHtml,
-        page.service.name,
-        page.service.directoryLinks,
-      );
+      const resolved = templates.map((t) => ({
+        url: resolveTemplate(t.urlTemplate, {
+          service: page.service.name,
+          city: page.location.city,
+          state: page.location.state,
+          zip: page.location.zip,
+        }),
+        platform: t.platform,
+      }));
+
+      const newBody = reapplyTrustLinks(page.bodyHtml, page.service.name, resolved);
       if (newBody !== page.bodyHtml) {
         await prisma.generatedPage.update({
           where: { id: page.id },

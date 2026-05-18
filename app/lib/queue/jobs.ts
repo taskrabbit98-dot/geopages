@@ -9,6 +9,7 @@ import { assemblePageHtml, calculateQualityScore } from "~/lib/content/generator
 import { isTooSimilar } from "~/lib/content/similarity";
 import { getMapEmbedUrl } from "~/lib/shopify/maps";
 import { getImageUrl } from "~/lib/shopify/images";
+import { resolveTemplate } from "~/lib/content/trustLinks";
 
 const MAX_CONCURRENT = 3;
 const MAX_RETRIES = 2;
@@ -73,18 +74,26 @@ async function executeGeneration(
   serviceId: string,
   locationId: string
 ): Promise<void> {
-  const [service, location, settings] = await Promise.all([
-    prisma.service.findFirst({
-      where: { id: serviceId, shop },
-      include: { directoryLinks: true },
-    }),
+  const [service, location, settings, trustTemplates] = await Promise.all([
+    prisma.service.findFirst({ where: { id: serviceId, shop } }),
     prisma.location.findFirst({ where: { id: locationId, shop } }),
     prisma.appSettings.findUnique({ where: { shop } }),
+    prisma.trustLinkTemplate.findMany({ where: { shop }, orderBy: { sortOrder: "asc" } }),
   ]);
 
   if (!service || !location || !settings) {
     throw new Error("Missing service, location, or settings");
   }
+
+  const resolvedTrustLinks = trustTemplates.map((t) => ({
+    url: resolveTemplate(t.urlTemplate, {
+      service: service.name,
+      city: location.city,
+      state: location.state,
+      zip: location.zip,
+    }),
+    platform: t.platform,
+  }));
 
   const provider = createAIProvider(
     settings.defaultAiModel,
@@ -164,14 +173,14 @@ async function executeGeneration(
     slug,
     imageUrl,
     mapEmbedUrl,
-    directoryLinks: service.directoryLinks,
+    directoryLinks: resolvedTrustLinks,
     relatedPages,
   });
 
   const qualityScore = calculateQualityScore({
     bodyHtml,
     faqCount: content.faq.length,
-    directoryLinksCount: service.directoryLinks.length,
+    directoryLinksCount: resolvedTrustLinks.length,
     hasImage: !!imageUrl,
     hasMap: !!mapEmbedUrl,
     serviceName: service.name,
