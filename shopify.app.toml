@@ -1,6 +1,6 @@
 name = "pseo-app"
 client_id = "be061332675239ef0b66218eceb307ba"
-application_url = "https://shopify-pseo-app-production.up.railway.app"
+application_url = "https://shopify-pseo-app.fly.dev"
 embedded = true
 
 [build]
@@ -12,16 +12,16 @@ scopes = "write_content,read_content,write_metaobjects,read_metaobjects,read_the
 
 [auth]
 redirect_urls = [
-  "https://shopify-pseo-app-production.up.railway.app/auth/callback",
-  "https://shopify-pseo-app-production.up.railway.app/auth/shopify/callback",
-  "https://shopify-pseo-app-production.up.railway.app/exitiframe"
+  "https://shopify-pseo-app.fly.dev/auth/callback",
+  "https://shopify-pseo-app.fly.dev/auth/shopify/callback",
+  "https://shopify-pseo-app.fly.dev/exitiframe"
 ]
 
 [webhooks]
 api_version = "2024-07"
 
 [app_proxy]
-url = "https://shopify-pseo-app-production.up.railway.app/apps/pseo"
+url = "https://shopify-pseo-app.fly.dev/apps/pseo"
 subpath = "pseo"
 prefix = "apps"
 
