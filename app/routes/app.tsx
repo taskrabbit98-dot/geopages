@@ -26,6 +26,7 @@ export default function App() {
         <a href="/app/locations">Locations</a>
         <a href="/app/generate">Page Generator</a>
         <a href="/app/bulk">Bulk Operations</a>
+        <a href="/app/menu">Storefront Menu</a>
         <a href="/app/settings">Settings</a>
       </NavMenu>
       <Outlet />
