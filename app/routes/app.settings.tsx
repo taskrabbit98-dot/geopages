@@ -7,12 +7,12 @@ import {
   Card,
   Text,
   BlockStack,
+  InlineStack,
   TextField,
   Select,
   Button,
   Banner,
   FormLayout,
-  Divider,
 } from "@shopify/polaris";
 import { useState } from "react";
 
