@@ -35,6 +35,131 @@ function sanitize(html: string): string {
 }
 
 /**
+ * Walks the page HTML and wraps occurrences of the service name with anchor
+ * tags pointing at the merchant's directory profile URLs. One occurrence per
+ * link, in document order. Skips text that is already inside an anchor or
+ * inside a heading, so we don't pollute h1/h2/h3 with links.
+ *
+ * Result: a paragraph that mentions "retatrutide" 5 times will get 5 different
+ * anchors (yelp, bbb, google maps, etc.) — each linking the same service name
+ * to a different trust URL.
+ */
+export function embedTrustLinks(
+  html: string,
+  serviceName: string,
+  links: Pick<DirectoryLink, "url" | "platform">[],
+): string {
+  if (!links || links.length === 0 || !serviceName) return html;
+
+  const dom = new JSDOM(`<!DOCTYPE html><body>${html}</body>`);
+  const doc = dom.window.document;
+  const target = serviceName.toLowerCase();
+
+  let linkIndex = 0;
+
+  function isInsideSkippableAncestor(node: Node): boolean {
+    let p: Node | null = node.parentNode;
+    while (p && (p as Element).tagName) {
+      const tag = (p as Element).tagName.toLowerCase();
+      if (tag === "a" || /^h[1-6]$/.test(tag)) return true;
+      p = p.parentNode;
+    }
+    return false;
+  }
+
+  function processTextNode(node: Text): void {
+    if (linkIndex >= links.length) return;
+    if (isInsideSkippableAncestor(node)) return;
+
+    const text = node.textContent || "";
+    const lower = text.toLowerCase();
+    const idx = lower.indexOf(target);
+    if (idx === -1) return;
+
+    const before = text.substring(0, idx);
+    const match = text.substring(idx, idx + serviceName.length);
+    const after = text.substring(idx + serviceName.length);
+
+    const fragment = doc.createDocumentFragment();
+    if (before) fragment.appendChild(doc.createTextNode(before));
+
+    const anchor = doc.createElement("a");
+    anchor.setAttribute("href", links[linkIndex].url);
+    anchor.setAttribute("target", "_blank");
+    anchor.setAttribute("rel", "noopener noreferrer nofollow");
+    anchor.textContent = match;
+    fragment.appendChild(anchor);
+
+    linkIndex++;
+
+    let afterNode: Text | null = null;
+    if (after) {
+      afterNode = doc.createTextNode(after);
+      fragment.appendChild(afterNode);
+    }
+
+    node.parentNode!.replaceChild(fragment, node);
+
+    // Continue scanning the "after" text for more occurrences
+    if (afterNode && linkIndex < links.length) {
+      processTextNode(afterNode);
+    }
+  }
+
+  function walk(node: Node): void {
+    if (linkIndex >= links.length) return;
+
+    if (node.nodeType === 3) {
+      processTextNode(node as Text);
+      return;
+    }
+    if (node.nodeType === 1) {
+      const children = Array.from(node.childNodes);
+      for (const child of children) {
+        if (linkIndex >= links.length) return;
+        walk(child);
+      }
+    }
+  }
+
+  walk(doc.body);
+  return doc.body.innerHTML;
+}
+
+/**
+ * Removes anchor tags we previously inserted as trust links — identified by
+ * rel="...nofollow..." — and keeps their inner text. Lets us re-embed cleanly
+ * when the merchant adds/removes trust links on an existing page.
+ */
+export function stripTrustLinks(html: string): string {
+  const dom = new JSDOM(`<!DOCTYPE html><body>${html}</body>`);
+  const doc = dom.window.document;
+
+  const anchors = Array.from(doc.querySelectorAll('a[rel~="nofollow"]'));
+  for (const a of anchors) {
+    const text = doc.createTextNode(a.textContent || "");
+    a.parentNode?.replaceChild(text, a);
+  }
+  // Merge adjacent text nodes that result from the swap, so future runs can
+  // match across the join point.
+  doc.body.normalize();
+  return doc.body.innerHTML;
+}
+
+/**
+ * Convenience: clear any previous trust-link anchors and re-embed fresh ones
+ * based on the current set of links. Use this when the merchant changed the
+ * service's trust-link list and wants existing pages updated.
+ */
+export function reapplyTrustLinks(
+  html: string,
+  serviceName: string,
+  links: Pick<DirectoryLink, "url" | "platform">[],
+): string {
+  return embedTrustLinks(stripTrustLinks(html), serviceName, links);
+}
+
+/**
  * Assembles the full page body HTML from AI content + template variables.
  */
 export function assemblePageHtml(params: AssembleParams): string {
@@ -81,16 +206,6 @@ export function assemblePageHtml(params: AssembleParams): string {
     </details>`
     )
     .join("\n");
-
-  const dirLinksHtml =
-    directoryLinks.length > 0
-      ? directoryLinks
-          .map(
-            (l) =>
-              `<li><a href="${l.url}" target="_blank" rel="noopener noreferrer">${l.anchorText}</a></li>`
-          )
-          .join("\n      ")
-      : '<li>No directory links added yet. Add them in the Services manager.</li>';
 
   const relatedHtml =
     relatedPages.length > 0
@@ -146,7 +261,7 @@ export function assemblePageHtml(params: AssembleParams): string {
   </div>`
     : "";
 
-  return `<script type="application/ld+json">
+  const assembled = `<script type="application/ld+json">
 ${JSON.stringify(schema, null, 2)}
 </script>
 
@@ -178,14 +293,6 @@ ${JSON.stringify(schema, null, 2)}
 
   ${imageSection}
 
-  <div class="pseo-directories">
-    <h2>Find ${businessName} on the Web</h2>
-    <p>Verify our ${serviceName} credentials and read reviews:</p>
-    <ul>
-      ${dirLinksHtml}
-    </ul>
-  </div>
-
   <div class="pseo-faq">
     <h2>Frequently Asked Questions — ${serviceName} in ${locationName}</h2>
     ${faqHtml}
@@ -199,6 +306,8 @@ ${JSON.stringify(schema, null, 2)}
   ${relatedSection}
 
 </div>`;
+
+  return embedTrustLinks(assembled, serviceName, directoryLinks);
 }
 
 /**

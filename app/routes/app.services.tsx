@@ -191,10 +191,15 @@ export default function Services() {
 
                       <Banner tone="info">
                         <p>
-                          Trust links are profile URLs of YOUR business on third-party sites
-                          (Yelp, Google Business, BBB, Facebook). They appear as a "Find us on the web"
-                          section on every generated page, signaling to visitors and search engines
-                          that you're a real business. <strong>Skip this if you don't have any yet — pages still work fine.</strong>
+                          Each trust link you add becomes an <strong>inline anchor</strong> on the service
+                          name inside the page content. Add 5 links → the service name gets linked
+                          5 times throughout the article, each pointing to a different directory
+                          (Yelp, BBB, Google Maps, etc.). Great for off-site SEO signals.
+                        </p>
+                        <p style={{ marginTop: 8 }}>
+                          <strong>Existing pages?</strong> After adding/removing links here, go to
+                          <em> Bulk Operations → Refresh trust-link anchors</em> to apply changes to
+                          already-generated pages.
                         </p>
                       </Banner>
 

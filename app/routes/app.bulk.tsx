@@ -19,6 +19,7 @@ import { useState } from "react";
 import { authenticate } from "~/shopify.server";
 import prisma from "~/db.server";
 import { createAIProvider } from "~/lib/ai";
+import { reapplyTrustLinks } from "~/lib/content/generator";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -126,6 +127,35 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return json({ success: true, updated, failed, failures, total: pages.length });
   }
 
+  if (intent === "refresh-trust-links") {
+    const serviceFilter = formData.get("serviceId") as string;
+
+    const pages = await prisma.generatedPage.findMany({
+      where: {
+        shop,
+        ...(serviceFilter !== "all" ? { serviceId: serviceFilter } : {}),
+      },
+      include: { service: { include: { directoryLinks: true } } },
+    });
+
+    let updated = 0;
+    for (const page of pages) {
+      const newBody = reapplyTrustLinks(
+        page.bodyHtml,
+        page.service.name,
+        page.service.directoryLinks,
+      );
+      if (newBody !== page.bodyHtml) {
+        await prisma.generatedPage.update({
+          where: { id: page.id },
+          data: { bodyHtml: newBody, updatedAt: new Date() },
+        });
+        updated++;
+      }
+    }
+    return json({ success: true, refreshed: updated, total: pages.length });
+  }
+
   if (intent === "delete-pages") {
     const serviceId = formData.get("serviceId") as string;
     const statusFilter = formData.get("statusFilter") as string;
@@ -149,16 +179,25 @@ export default function BulkOperations() {
   const [section, setSection] = useState<string>("faq");
   const [deleteServiceId, setDeleteServiceId] = useState<string>("all");
   const [deleteStatus, setDeleteStatus] = useState<string>("archived");
+  const [trustServiceId, setTrustServiceId] = useState<string>("all");
 
   const isBusy = fetcher.state !== "idle";
   const data = fetcher.data as
     | { success: boolean; updated: number; failed: number; failures: string[]; total: number }
     | { success: boolean; deleted: number }
+    | { success: boolean; refreshed: number; total: number }
     | { error: string }
     | undefined;
 
   const handleRegenerate = () => {
     fetcher.submit({ intent: "regenerate-section", serviceId, section }, { method: "POST" });
+  };
+
+  const handleRefreshTrustLinks = () => {
+    fetcher.submit(
+      { intent: "refresh-trust-links", serviceId: trustServiceId },
+      { method: "POST" },
+    );
   };
 
   const handleBulkDelete = () => {
@@ -205,6 +244,13 @@ export default function BulkOperations() {
           <Banner title={`Deleted ${data.deleted} page(s)`} tone="success" />
         )}
 
+        {data && "refreshed" in data && (
+          <Banner
+            title={`Updated trust-link anchors on ${data.refreshed} of ${data.total} page(s)`}
+            tone="success"
+          />
+        )}
+
         {data && "error" in data && <Banner tone="critical">{data.error}</Banner>}
 
         <Layout>
@@ -249,6 +295,35 @@ export default function BulkOperations() {
                     disabled={!hasApiKey}
                   >
                     Refresh content
+                  </Button>
+                </InlineStack>
+              </BlockStack>
+            </Card>
+
+            <Card>
+              <BlockStack gap="400">
+                <Text variant="headingMd" as="h2">
+                  Refresh trust-link anchors
+                </Text>
+                <Text as="p" tone="subdued">
+                  When you add or remove trust links on a service, click this to update
+                  existing pages so the service name in their content gets re-linked to
+                  the latest URLs. No AI calls, no cost.
+                </Text>
+
+                <Select
+                  label="Which service?"
+                  value={trustServiceId}
+                  onChange={setTrustServiceId}
+                  options={[
+                    { label: "All services", value: "all" },
+                    ...services.map((s) => ({ label: s.name, value: s.id })),
+                  ]}
+                />
+
+                <InlineStack align="end">
+                  <Button variant="primary" onClick={handleRefreshTrustLinks} loading={isBusy}>
+                    Refresh trust-link anchors
                   </Button>
                 </InlineStack>
               </BlockStack>
