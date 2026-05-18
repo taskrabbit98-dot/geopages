@@ -101,6 +101,25 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return json({ success: true, queued });
   }
 
+  if (intent === "delete-selected") {
+    const pairsJson = formData.get("pairs") as string;
+    const pairs: { serviceId: string; locationId: string }[] = JSON.parse(pairsJson);
+
+    let deleted = 0;
+    for (const { serviceId, locationId } of pairs) {
+      const result = await prisma.generatedPage.deleteMany({
+        where: { shop, serviceId, locationId },
+      });
+      deleted += result.count;
+      // Also clean up any orphaned generation jobs for this cell
+      await prisma.generationJob.deleteMany({
+        where: { shop, serviceId, locationId },
+      });
+    }
+
+    return json({ success: true, deleted });
+  }
+
   return json({ error: "Unknown intent" }, { status: 400 });
 };
 
@@ -183,6 +202,20 @@ export default function Generate() {
     setSelected(new Set());
   };
 
+  const handleDelete = () => {
+    if (
+      window.confirm(
+        `Permanently delete ${pairs.length} page(s)? Their public URLs will 404. This cannot be undone.`,
+      )
+    ) {
+      fetcher.submit(
+        { intent: "delete-selected", pairs: JSON.stringify(pairs) },
+        { method: "POST" },
+      );
+      setSelected(new Set());
+    }
+  };
+
   return (
     <Page
       title="Page Generator"
@@ -198,6 +231,12 @@ export default function Generate() {
         {'queued' in (fetcher.data ?? {}) && (
           <Banner tone="success">
             Queued {(fetcher.data as { queued: number }).queued} generation job(s). Pages will appear as drafts shortly.
+          </Banner>
+        )}
+
+        {'deleted' in (fetcher.data ?? {}) && (
+          <Banner tone="success">
+            Deleted {(fetcher.data as { deleted: number }).deleted} page(s).
           </Banner>
         )}
 
@@ -221,14 +260,24 @@ export default function Generate() {
                   <Button size="slim" onClick={clearSelection} disabled={selected.size === 0}>Clear</Button>
                   <Text as="span" tone="subdued">{selected.size} selected · ~${estimatedCost} API cost</Text>
                 </InlineStack>
-                <Button
-                  variant="primary"
-                  disabled={selected.size === 0 || !hasApiKey}
-                  loading={fetcher.state !== "idle"}
-                  onClick={handleGenerate}
-                >
-                  {`Generate Selected (${selected.size})`}
-                </Button>
+                <InlineStack gap="200">
+                  <Button
+                    tone="critical"
+                    disabled={selected.size === 0}
+                    loading={fetcher.state !== "idle"}
+                    onClick={handleDelete}
+                  >
+                    {`Delete Selected (${selected.size})`}
+                  </Button>
+                  <Button
+                    variant="primary"
+                    disabled={selected.size === 0 || !hasApiKey}
+                    loading={fetcher.state !== "idle"}
+                    onClick={handleGenerate}
+                  >
+                    {`Generate Selected (${selected.size})`}
+                  </Button>
+                </InlineStack>
               </InlineStack>
             </Card>
 

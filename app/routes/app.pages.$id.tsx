@@ -108,6 +108,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   }
 
   if (intent === "delete") {
+    await prisma.generationJob.deleteMany({
+      where: { shop, serviceId: page.serviceId, locationId: page.locationId },
+    });
     await prisma.generatedPage.delete({ where: { id: page.id } });
     return redirect("/app/generate");
   }

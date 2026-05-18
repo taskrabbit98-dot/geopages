@@ -27,7 +27,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     serviceCount,
     locationCount,
     pageStats,
-    recentJobs,
+    rawJobs,
+    services,
+    locations,
+    existingPages,
     settings,
   ] = await Promise.all([
     prisma.service.count({ where: { shop } }),
@@ -40,10 +43,31 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     prisma.generationJob.findMany({
       where: { shop },
       orderBy: { createdAt: "desc" },
-      take: 10,
+      take: 30,
+    }),
+    prisma.service.findMany({ where: { shop }, select: { id: true, name: true } }),
+    prisma.location.findMany({ where: { shop }, select: { id: true, name: true } }),
+    prisma.generatedPage.findMany({
+      where: { shop },
+      select: { serviceId: true, locationId: true },
     }),
     prisma.appSettings.findUnique({ where: { shop } }),
   ]);
+
+  // Only show jobs whose target page still exists, and resolve labels
+  const pageKey = new Set(existingPages.map((p) => `${p.serviceId}:${p.locationId}`));
+  const serviceById = new Map(services.map((s) => [s.id, s.name]));
+  const locationById = new Map(locations.map((l) => [l.id, l.name]));
+
+  const recentJobs = rawJobs
+    .filter((j) => pageKey.has(`${j.serviceId}:${j.locationId}`))
+    .slice(0, 10)
+    .map((j) => ({
+      id: j.id,
+      status: j.status,
+      serviceName: serviceById.get(j.serviceId) ?? "Deleted",
+      locationName: locationById.get(j.locationId) ?? "Deleted",
+    }));
 
   const draft = pageStats.find((s) => s.status === "draft")?._count ?? 0;
   const published = pageStats.find((s) => s.status === "published")?._count ?? 0;
@@ -221,7 +245,7 @@ export default function Dashboard() {
                   <BlockStack gap="200">
                     {recentJobs.map((job) => (
                       <div key={job.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <Text as="span" variant="bodySm">{job.id.slice(0, 8)}… {job.serviceId.slice(0, 6)} × {job.locationId.slice(0, 6)}</Text>
+                        <Text as="span" variant="bodySm">{job.serviceName} × {job.locationName}</Text>
                         <Badge tone={statusColor[job.status] ?? "info"}>{job.status}</Badge>
                       </div>
                     ))}
