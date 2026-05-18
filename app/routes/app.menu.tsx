@@ -107,7 +107,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         hierarchy === "services-first" ? page.service.name : page.location.name;
       const leafTitle =
         hierarchy === "services-first" ? page.location.name : page.service.name;
-      const leafUrl = `https://${shop}/apps/pseo/${page.slug}`;
+      const leafUrl = `https://${shop}/apps/services/${page.slug}`;
 
       if (!groups.has(groupKey)) {
         groups.set(groupKey, {

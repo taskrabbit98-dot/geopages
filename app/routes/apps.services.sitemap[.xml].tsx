@@ -4,12 +4,12 @@ import prisma from "~/db.server";
 
 /**
  * Public sitemap served via Shopify App Proxy at:
- *   https://<shop>.myshopify.com/apps/pseo/sitemap.xml
+ *   https://<shop>.myshopify.com/apps/services/sitemap.xml
  *
  * Requires the App Proxy to be configured in Partner Dashboard:
  *   - Subpath prefix: apps
  *   - Subpath: pseo
- *   - Proxy URL: https://<your-app>/apps/pseo
+ *   - Proxy URL: https://<your-app>/apps/services
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.public.appProxy(request);
@@ -31,7 +31,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     .map(
       (p) => `
   <url>
-    <loc>${shopUrl}/apps/pseo/${p.slug}</loc>
+    <loc>${shopUrl}/apps/services/${p.slug}</loc>
     <lastmod>${(p.updatedAt ?? p.publishedAt ?? new Date()).toISOString().split("T")[0]}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
