@@ -272,50 +272,327 @@ export function assemblePageHtml(params: AssembleParams): string {
 ${JSON.stringify(schema, null, 2)}
 </script>
 
-<div class="pseo-page" data-pseo-page="true">
+${PSEO_STYLES}
 
-  <h1>${sanitize(content.h1)}</h1>
+<article class="pseo-page" data-pseo-page="true">
+
+  <header class="pseo-header">
+    <h1>${sanitize(content.h1)}</h1>
+    <p class="pseo-breadcrumb">${serviceName} · ${locationCity}, ${locationState}</p>
+  </header>
 
   <div class="pseo-intro">
     ${sanitize(content.intro)}
   </div>
 
-  <div class="pseo-why">
+  <section class="pseo-why">
     <h2>Why Choose Us for ${serviceName} in ${locationName}</h2>
     <ul>
       ${whyList}
     </ul>
-  </div>
+  </section>
 
-  <div class="pseo-details">
+  <section class="pseo-details">
     <h2>About Our ${serviceName} Service</h2>
     ${sanitize(content.serviceDetails)}
-  </div>
+  </section>
 
   ${mapSection}
 
-  <div class="pseo-local">
+  <section class="pseo-local">
+    <h2>About ${locationName}</h2>
     ${sanitize(content.localSection)}
-  </div>
+  </section>
 
   ${imageSection}
 
-  <div class="pseo-faq">
-    <h2>Frequently Asked Questions — ${serviceName} in ${locationName}</h2>
-    ${faqHtml}
-  </div>
+  <section class="pseo-faq">
+    <h2>Frequently Asked Questions</h2>
+    <div class="pseo-faq-list">
+      ${faqHtml}
+    </div>
+  </section>
 
-  <div class="pseo-cta">
-    ${sanitize(content.cta)}
-    <a href="/contact" class="pseo-cta-button">Get a Free Quote</a>
-  </div>
+  <aside class="pseo-cta">
+    <div class="pseo-cta-body">
+      ${sanitize(content.cta)}
+    </div>
+    <a href="/pages/contact" class="pseo-cta-button">Get a Free Quote →</a>
+  </aside>
 
   ${relatedSection}
 
-</div>`;
+</article>`;
 
   return embedTrustLinks(assembled, serviceName, directoryLinks);
 }
+
+const PSEO_STYLES = `<style>
+.pseo-page {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.7;
+  color: #202223;
+  font-size: 17px;
+}
+.pseo-page * { box-sizing: border-box; }
+
+/* Header */
+.pseo-header { margin-bottom: 32px; }
+.pseo-page h1 {
+  font-size: clamp(28px, 4.5vw, 42px);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+  color: #1a1a1a;
+}
+.pseo-breadcrumb {
+  color: #6d7175;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+/* Headings */
+.pseo-page h2 {
+  font-size: clamp(22px, 3vw, 28px);
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  margin: 48px 0 16px;
+  color: #1a1a1a;
+}
+.pseo-page p { margin: 0 0 16px; }
+.pseo-page p:last-child { margin-bottom: 0; }
+
+/* Links */
+.pseo-page a {
+  color: #006fbb;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  transition: color 0.15s ease;
+}
+.pseo-page a:hover { color: #004c84; text-decoration-thickness: 2px; }
+
+/* Intro */
+.pseo-intro {
+  font-size: 18px;
+  color: #2c2c2c;
+  background: #f6f6f7;
+  border-left: 4px solid #008060;
+  border-radius: 0 8px 8px 0;
+  padding: 20px 24px;
+  margin: 0 0 16px;
+}
+.pseo-intro p:first-child { font-weight: 500; }
+
+/* Why-choose-us bullets */
+.pseo-why ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+.pseo-why li {
+  position: relative;
+  padding: 14px 16px 14px 48px;
+  background: #f9fafb;
+  border-radius: 10px;
+  border: 1px solid #e1e3e5;
+}
+.pseo-why li::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  background: #008060;
+  border-radius: 50%;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='white'><path d='M6 11.4L2.6 8l1.4-1.4L6 8.6l6-6L13.4 4z'/></svg>");
+  background-position: center;
+  background-size: 12px;
+  background-repeat: no-repeat;
+}
+
+/* Map */
+.pseo-map {
+  margin: 32px 0;
+  padding: 24px;
+  background: #f6f6f7;
+  border-radius: 14px;
+  text-align: center;
+}
+.pseo-map h2 { margin-top: 0; }
+.pseo-map iframe {
+  border-radius: 10px;
+  width: 100%;
+  max-width: 600px;
+}
+
+/* Local section */
+.pseo-local {
+  padding: 24px;
+  background: linear-gradient(135deg, #f9fafb 0%, #f0f4f8 100%);
+  border-radius: 14px;
+  margin: 32px 0;
+  border: 1px solid #e1e3e5;
+}
+.pseo-local h2 { margin-top: 0; }
+
+/* Featured image */
+.pseo-image { margin: 32px 0; }
+.pseo-image img {
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+  display: block;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* FAQ accordion */
+.pseo-faq-list {
+  display: grid;
+  gap: 10px;
+}
+.pseo-faq-item {
+  border: 1px solid #e1e3e5;
+  border-radius: 12px;
+  background: white;
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.pseo-faq-item:hover { border-color: #c8cccf; }
+.pseo-faq-item[open] {
+  border-color: #008060;
+  box-shadow: 0 1px 6px rgba(0, 128, 96, 0.12);
+}
+.pseo-faq-item summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 18px 56px 18px 22px;
+  position: relative;
+  font-weight: 600;
+  font-size: 16px;
+  color: #1a1a1a;
+  user-select: none;
+}
+.pseo-faq-item summary::-webkit-details-marker { display: none; }
+.pseo-faq-item summary h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  display: inline;
+  line-height: 1.5;
+}
+.pseo-faq-item summary::after {
+  content: "";
+  position: absolute;
+  right: 22px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-right: 2px solid #008060;
+  border-bottom: 2px solid #008060;
+  transform: translateY(-75%) rotate(45deg);
+  transition: transform 0.2s ease;
+}
+.pseo-faq-item[open] summary::after {
+  transform: translateY(-25%) rotate(-135deg);
+}
+.pseo-faq-item p {
+  padding: 0 22px 20px;
+  margin: 0;
+  color: #4a4a4a;
+  line-height: 1.7;
+}
+
+/* CTA card */
+.pseo-cta {
+  margin: 56px 0 32px;
+  padding: 40px 32px;
+  background: linear-gradient(135deg, #008060 0%, #005f47 100%);
+  border-radius: 18px;
+  color: white;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0, 128, 96, 0.2);
+}
+.pseo-cta-body { margin-bottom: 24px; }
+.pseo-cta-body p {
+  color: white;
+  font-size: 19px;
+  line-height: 1.55;
+}
+.pseo-cta-button {
+  display: inline-block;
+  padding: 16px 36px;
+  background: white;
+  color: #008060 !important;
+  font-weight: 600;
+  font-size: 17px;
+  border-radius: 10px;
+  text-decoration: none !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  letter-spacing: 0.01em;
+}
+.pseo-cta-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+}
+
+/* Related pages */
+.pseo-related {
+  margin: 48px 0;
+  padding: 28px;
+  background: #f9fafb;
+  border-radius: 14px;
+  border: 1px solid #e1e3e5;
+}
+.pseo-related h2 { margin-top: 0; }
+.pseo-related ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pseo-related li { margin: 0; }
+.pseo-related a {
+  display: inline-block;
+  padding: 8px 14px;
+  background: white;
+  border: 1px solid #c8cccf;
+  border-radius: 999px;
+  text-decoration: none !important;
+  font-size: 14px;
+  color: #202223;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.pseo-related a:hover {
+  background: #f6f6f7;
+  border-color: #008060;
+  color: #008060;
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+  .pseo-page { padding: 24px 16px 48px; font-size: 16px; }
+  .pseo-page h2 { margin: 36px 0 14px; }
+  .pseo-intro { padding: 16px 18px; font-size: 17px; }
+  .pseo-cta { padding: 28px 20px; }
+  .pseo-cta-body p { font-size: 17px; }
+  .pseo-faq-item summary { padding: 16px 48px 16px 18px; font-size: 15px; }
+  .pseo-faq-item p { padding: 0 18px 16px; }
+}
+</style>`;
 
 /**
  * Calculates a quality score 0-100 for a generated page.
