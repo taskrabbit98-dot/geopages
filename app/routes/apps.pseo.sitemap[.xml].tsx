@@ -31,7 +31,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     .map(
       (p) => `
   <url>
-    <loc>${shopUrl}/pages/${p.slug}</loc>
+    <loc>${shopUrl}/apps/pseo/${p.slug}</loc>
     <lastmod>${(p.updatedAt ?? p.publishedAt ?? new Date()).toISOString().split("T")[0]}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>

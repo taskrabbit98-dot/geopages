@@ -79,47 +79,19 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       data: { title, h1, metaTitle, metaDescription, bodyHtml, updatedAt: new Date() },
     });
 
-    // Sync to Shopify if already published
-    if (page.shopifyPageId) {
-      await updateShopifyPage(admin, page.shopifyPageId, { title, bodyHtml, metaTitle, metaDescription });
-    }
-
-    return json({ success: true, message: "Saved" });
+    return json({ success: true, message: "Saved — live page reflects new content immediately" });
   }
 
   if (intent === "publish") {
-    try {
-      const shopifyPage = await createShopifyPage(admin, {
-        title: page.title,
-        handle: page.slug,
-        bodyHtml: page.bodyHtml,
-        metaTitle: page.metaTitle,
-        metaDescription: page.metaDescription,
-        published: true,
-      });
-
-      await prisma.generatedPage.update({
-        where: { id: page.id },
-        data: {
-          shopifyPageId: shopifyPage.id,
-          status: "published",
-          publishedAt: new Date(),
-        },
-      });
-
-      const liveUrl = `https://${shop}/pages/${shopifyPage.handle}`;
-      return json({ success: true, message: "Published", url: liveUrl });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error("[publish] failed", message);
-      return json({ error: `Publish failed: ${message}` }, { status: 500 });
-    }
+    await prisma.generatedPage.update({
+      where: { id: page.id },
+      data: { status: "published", publishedAt: new Date() },
+    });
+    const liveUrl = `https://${shop}/apps/pseo/${page.slug}`;
+    return json({ success: true, message: "Published", url: liveUrl });
   }
 
   if (intent === "unpublish") {
-    if (page.shopifyPageId) {
-      await updateShopifyPage(admin, page.shopifyPageId, { published: false });
-    }
     await prisma.generatedPage.update({
       where: { id: page.id },
       data: { status: "draft" },
@@ -192,9 +164,7 @@ export default function PageEditor() {
   const [bodyHtml, setBodyHtml] = useState(page.bodyHtml);
 
   const isBusy = fetcher.state !== "idle";
-  const shopifyUrl = page.shopifyPageId
-    ? `${shopUrl}/pages/${page.slug}`
-    : null;
+  const shopifyUrl = page.status === "published" ? `${shopUrl}/apps/pseo/${page.slug}` : null;
 
   return (
     <Page

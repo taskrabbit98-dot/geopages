@@ -18,7 +18,6 @@ import {
 import { authenticate } from "~/shopify.server";
 import prisma from "~/db.server";
 import { enqueueJob } from "~/lib/queue/jobs";
-import { createShopifyPage } from "~/lib/shopify/pages";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -63,50 +62,26 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session, admin } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const shop = session.shop;
 
   const formData = await request.formData();
   const intent = formData.get("intent");
 
   if (intent === "publish-all-drafts") {
-    const drafts = await prisma.generatedPage.findMany({
+    const result = await prisma.generatedPage.updateMany({
       where: { shop, status: "draft" },
+      data: { status: "published", publishedAt: new Date() },
     });
+    return json({ success: true, published: result.count, failed: 0, failures: [] as string[] });
+  }
 
-    let published = 0;
-    let failed = 0;
-    const failures: string[] = [];
-
-    for (const page of drafts) {
-      try {
-        const shopifyPage = await createShopifyPage(admin, {
-          title: page.title,
-          handle: page.slug,
-          bodyHtml: page.bodyHtml,
-          metaTitle: page.metaTitle,
-          metaDescription: page.metaDescription,
-          published: true,
-        });
-
-        await prisma.generatedPage.update({
-          where: { id: page.id },
-          data: {
-            shopifyPageId: shopifyPage.id,
-            status: "published",
-            publishedAt: new Date(),
-          },
-        });
-        published++;
-      } catch (err) {
-        failed++;
-        const msg = err instanceof Error ? err.message : String(err);
-        failures.push(`${page.slug}: ${msg}`);
-        console.error(`[publish-all] failed for ${page.slug}`, msg);
-      }
-    }
-
-    return json({ success: true, published, failed, failures });
+  if (intent === "unpublish-all") {
+    const result = await prisma.generatedPage.updateMany({
+      where: { shop, status: "published" },
+      data: { status: "draft" },
+    });
+    return json({ success: true, unpublished: result.count });
   }
 
   if (intent === "generate-all") {
