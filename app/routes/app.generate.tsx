@@ -80,12 +80,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const intent = formData.get("intent") as string;
 
   if (intent === "generate-selected") {
+    // Gate behind active subscription
+    const sub = await prisma.subscription.findUnique({ where: { shop } });
+    if (!sub || sub.status !== "ACTIVE") {
+      return json(
+        { error: "Subscribe to generate pages. Go to Billing to start your free trial." },
+        { status: 402 },
+      );
+    }
+
     const pairsJson = formData.get("pairs") as string;
     const pairs: { serviceId: string; locationId: string }[] = JSON.parse(pairsJson);
     let queued = 0;
 
     for (const { serviceId, locationId } of pairs) {
-      // Check if a job already running
       const existing = await prisma.generationJob.findFirst({
         where: { shop, serviceId, locationId, status: { in: ["pending", "running"] } },
       });
