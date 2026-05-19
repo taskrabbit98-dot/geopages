@@ -14,7 +14,7 @@ export const PLAN = {
   name: "PSEO Pro",
   amount: 30.0,
   currencyCode: "USD",
-  trialDays: 14,
+  trialDays: 3,
   interval: "EVERY_30_DAYS" as const,
 };
 

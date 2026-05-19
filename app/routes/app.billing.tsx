@@ -141,7 +141,7 @@ export default function Billing() {
         {justActivated && (
           <Banner tone="success" title="🎉 Subscription active!">
             <p>
-              Your 14-day free trial has started. You'll be charged ${plan.amount}/month after the
+              Your 3-day free trial has started. You'll be charged ${plan.amount}/month after the
               trial ends. Cancel anytime.
             </p>
           </Banner>
@@ -155,7 +155,7 @@ export default function Billing() {
           <Banner tone="warning" title="Subscribe to start generating pages">
             <p>
               Page generation, trust links, and bulk operations require an active subscription.
-              You'll get a <strong>14-day free trial</strong> — no charge until day 15.
+              You'll get a <strong>3-day free trial</strong> — no charge until day 4.
             </p>
           </Banner>
         )}
@@ -181,13 +181,13 @@ export default function Billing() {
                   </Text>
                 </Text>
                 <Text as="p" tone="subdued">
-                  {plan.name} · 14-day free trial · Cancel anytime
+                  {plan.name} · 3-day free trial · Cancel anytime
                 </Text>
               </BlockStack>
 
               {!hasAccess && (
                 <Button variant="primary" onClick={handleSubscribe} loading={isBusy} size="large">
-                  Start 14-day free trial
+                  Start 3-day free trial
                 </Button>
               )}
               {hasAccess && subscription.status === "ACTIVE" && (
