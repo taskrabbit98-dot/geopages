@@ -1,6 +1,6 @@
 name = "pseo-app"
 client_id = "e352721848b6acf76fc4250f68fcda3d"
-application_url = "https://shopify-pseo-app.fly.dev"
+application_url = "https://geopages.fly.dev"
 embedded = true
 
 [build]
@@ -12,16 +12,16 @@ scopes = "write_content,read_content,write_metaobjects,read_metaobjects,read_the
 
 [auth]
 redirect_urls = [
-  "https://shopify-pseo-app.fly.dev/auth/callback",
-  "https://shopify-pseo-app.fly.dev/auth/shopify/callback",
-  "https://shopify-pseo-app.fly.dev/exitiframe"
+  "https://geopages.fly.dev/auth/callback",
+  "https://geopages.fly.dev/auth/shopify/callback",
+  "https://geopages.fly.dev/exitiframe"
 ]
 
 [webhooks]
 api_version = "2024-07"
 
 [app_proxy]
-url = "https://shopify-pseo-app.fly.dev/apps/service-areas"
+url = "https://geopages.fly.dev/apps/service-areas"
 subpath = "service-areas"
 prefix = "apps"
 

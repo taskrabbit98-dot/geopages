@@ -1,4 +1,4 @@
-app = "shopify-pseo-app"
+app = "geopages"
 primary_region = "iad"
 
 [build]
