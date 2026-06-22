@@ -2,6 +2,8 @@
 
 End-to-end setup for getting `geopages` running on Fly with a fresh Shopify Partner account.
 
+> ⚠️ **Already running?** If `geopages` is already deployed on Fly and you just want to set up a new dev machine, skip to **Section: Local development** at the bottom. Don't re-run sections 1–4 or you'll create duplicate infrastructure.
+
 ## Prerequisites
 
 - Shopify Partner account (https://partners.shopify.com)
@@ -39,15 +41,18 @@ Save each section. Copy the **Client ID** (API key) and **Client secret** — yo
 
 Install the Fly CLI (https://fly.io/docs/flyctl/install/), then:
 
+**On Windows PowerShell**, write each command on a single line (PowerShell does not honor backslash line continuation the way bash does — multi-line commands with `\` end up running only the first line and prompting interactively for the rest):
+
 ```bash
 flyctl auth login
 flyctl apps create geopages --org personal
-flyctl postgres create --name geopages-db --region iad --org personal \
-  --initial-cluster-size 1 --vm-size shared-cpu-1x --volume-size 1
+flyctl postgres create --name geopages-db --region iad --org personal --initial-cluster-size 1 --vm-size shared-cpu-1x --volume-size 1
 flyctl postgres attach geopages-db --app geopages --yes
 ```
 
 The attach step creates a database + user and automatically sets the `DATABASE_URL` secret on the app.
+
+> ⚠️ If you skip the size flags on `postgres create`, Fly defaults to a 3-node HA cluster (~$30/month). The flags above pick a single-node shared-cpu-1x with a 1GB volume, which is plenty for development and well under $5/month.
 
 ## 3. Set the rest of the secrets
 
