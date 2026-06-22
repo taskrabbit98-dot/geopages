@@ -15,6 +15,29 @@ export interface GenerationParams {
    * occurrences for inline trust-link anchors. Defaults to 5.
    */
   minServiceNameMentions?: number;
+  /**
+   * Real local context from Google Places API. The AI uses these as hard
+   * facts to reference, instead of inventing neighborhoods and landmarks.
+   */
+  localContext?: {
+    neighborhoods: string[];
+    landmarks: string[];
+    zipCodes: string[];
+    cityFullName: string;
+    county?: string;
+  };
+  /**
+   * Long-tail keyword variations the AI should naturally weave in for
+   * better topical coverage in search results.
+   */
+  keywordPhrases?: string[];
+}
+
+export interface PageOutline {
+  mainAngle: string;
+  uniqueValueProps: string[];
+  faqTopics: string[];
+  localReferences: string[];
 }
 
 export interface FAQItem {
@@ -48,56 +71,80 @@ export function buildSystemPrompt(params: GenerationParams): string {
   const styleNote = styles[params.writingStyle ?? "conversational"];
   const minMentions = params.minServiceNameMentions ?? 5;
 
-  return `You are an expert SEO content writer. ${styleNote}
+  const lc = params.localContext;
+  const localFactsBlock = lc && (lc.neighborhoods.length || lc.landmarks.length || lc.zipCodes.length)
+    ? `\nREAL LOCAL FACTS (use these — do not invent others):
+${lc.neighborhoods.length ? `- Neighborhoods: ${lc.neighborhoods.join(", ")}` : ""}
+${lc.landmarks.length ? `- Landmarks/POIs: ${lc.landmarks.join(", ")}` : ""}
+${lc.zipCodes.length ? `- ZIP codes: ${lc.zipCodes.join(", ")}` : ""}
+${lc.county ? `- County: ${lc.county}` : ""}`
+    : "";
 
-Write a complete, unique, high-quality page for a local service business. The page is for:
+  const keywordBlock = params.keywordPhrases && params.keywordPhrases.length
+    ? `\nLONG-TAIL KEYWORDS (weave at least 3 of these naturally into the body):
+${params.keywordPhrases.map((k) => `- "${k}"`).join("\n")}`
+    : "";
+
+  return `You are an expert local-SEO content writer. ${styleNote}
+
+Write a UNIQUE, locally-specific page for this service business:
 
 Service: ${params.serviceName}
 Location: ${params.locationCity}, ${params.locationState}
 Business Name: ${params.businessName}
 Business Phone: ${params.businessPhone}
 Business Address: ${params.businessAddress}
+${localFactsBlock}
+${keywordBlock}
 
-REQUIREMENTS:
-1. H1: A natural, keyword-rich heading (include service + location)
-2. Introduction: 2-3 paragraphs, 150-200 words total. Mention the location naturally.
-3. Why Choose Us: 3-4 bullet points specific to this service
-4. Service Details: 2-3 paragraphs explaining the service in this location context
-5. Local Area Section: 1 paragraph mentioning local context (neighborhoods, landmarks)
-6. FAQ: Exactly 5 questions and detailed answers relevant to this service + location
-7. Call to Action: One short paragraph ending the page
-
-RULES:
-- Never copy content from another page. Each page must be unique.
-- Write naturally — avoid keyword stuffing
-- Use second person ("you", "your") to address the reader
-- Do not invent statistics or certifications
-- Minimum 600 words total
-- IMPORTANT: Use the EXACT phrase "${params.serviceName}" (verbatim, same wording, no
-  variations like "${params.serviceName.toLowerCase()}-related work" or rephrasings) at
-  least ${minMentions} times distributed across intro, serviceDetails, and localSection
-  body text. Do NOT count occurrences inside headings, FAQ, or CTA. Vary the surrounding
-  sentence each time so it reads naturally.
-- Return as structured JSON matching the schema below
-
-Return ONLY valid JSON, no markdown, no explanation:
+STRUCTURE (return as JSON, no markdown):
 {
-  "h1": "string",
-  "metaTitle": "string (55-60 chars)",
-  "metaDescription": "string (150-160 chars)",
-  "intro": "string (HTML paragraphs)",
-  "whyChooseUs": ["string", "string", "string"],
-  "serviceDetails": "string (HTML paragraphs)",
-  "localSection": "string (HTML paragraph)",
-  "faq": [
-    {"question": "string", "answer": "string"},
-    {"question": "string", "answer": "string"},
-    {"question": "string", "answer": "string"},
-    {"question": "string", "answer": "string"},
-    {"question": "string", "answer": "string"}
-  ],
-  "cta": "string (HTML paragraph)"
-}`;
+  "h1": "Natural keyword-rich H1 (include service + location)",
+  "metaTitle": "55-60 chars, includes service + city",
+  "metaDescription": "150-160 chars, includes service + city + a compelling angle",
+  "intro": "<p>2-3 paragraphs, 150-200 words. Reference at least one real neighborhood OR landmark from the facts above.</p>",
+  "whyChooseUs": ["3-4 bullets, each specific to ${params.serviceName} — no generic 'experienced team' filler"],
+  "serviceDetails": "<p>2-3 paragraphs explaining ${params.serviceName} in context. Mention ZIP code OR county from facts above.</p>",
+  "localSection": "<p>1 paragraph referencing 2+ real neighborhoods or landmarks from facts above.</p>",
+  "faq": [5 unique questions specific to ${params.serviceName} in ${params.locationCity}, with detailed 2-3 sentence answers],
+  "cta": "<p>Short closing paragraph, 1-2 sentences.</p>"
+}
+
+HARD RULES:
+1. Use the EXACT phrase "${params.serviceName}" verbatim ${minMentions}+ times in intro+serviceDetails+localSection body text (not in headings/FAQ/CTA).
+2. Reference at least 2 of the real local facts (neighborhoods/landmarks/ZIPs) — no inventing places.
+3. Minimum 600 words total across all sections.
+4. NO filler phrases: ban "our experienced team", "top-notch service", "second to none", "state-of-the-art", "passionate about", "go above and beyond".
+5. NO invented statistics or certifications. NO claims like "voted #1" or "award-winning" unless explicitly given.
+6. Second person ("you", "your") to address the reader.
+7. Each FAQ question must be DIFFERENT and specific — not generic questions like "How long have you been in business?".
+8. Return ONLY valid JSON. No markdown fences, no commentary before or after.`;
+}
+
+/**
+ * Smaller prompt for the outline pass — generates a strategy doc the
+ * main generation prompt builds on. Cuts token use and improves
+ * differentiation between pages.
+ */
+export function buildOutlinePrompt(params: GenerationParams): string {
+  const lc = params.localContext;
+  const local = lc && (lc.neighborhoods.length || lc.landmarks.length)
+    ? `Real local data: neighborhoods=${lc.neighborhoods.slice(0, 3).join(",")}; landmarks=${lc.landmarks.slice(0, 3).join(",")}`
+    : "";
+
+  return `You are planning a unique SEO page for "${params.serviceName}" in "${params.locationCity}, ${params.locationState}".
+
+${local}
+
+Return JSON ONLY (no markdown):
+{
+  "mainAngle": "1-sentence unique angle for this page (e.g., 'fast emergency service for Brandon's older homes')",
+  "uniqueValueProps": ["3 SHORT differentiators specific to this service + location combo"],
+  "faqTopics": ["5 specific topics for FAQ — each must be unique and locally-relevant"],
+  "localReferences": ["3 specific local references to weave in (neighborhood names, ZIP codes, landmarks)"]
+}
+
+Be SPECIFIC. Avoid generic angles like "quality service" — find a real reason this combo matters.`;
 }
 
 export function parseAIResponse(raw: string): PageContent {

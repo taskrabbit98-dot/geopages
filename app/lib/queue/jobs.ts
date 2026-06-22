@@ -10,6 +10,9 @@ import { isTooSimilar } from "~/lib/content/similarity";
 import { getMapEmbedUrl } from "~/lib/shopify/maps";
 import { getImageUrl } from "~/lib/shopify/images";
 import { resolveTemplate } from "~/lib/content/trustLinks";
+import { fetchLocalContext, buildKeywordPhrases, type LocalContext } from "~/lib/local/places";
+
+const LOCAL_CONTEXT_TTL_DAYS = 30;
 
 const MAX_CONCURRENT = 3;
 const MAX_RETRIES = 2;
@@ -109,6 +112,9 @@ async function executeGeneration(
   const styleIndex =
     (service.name.length + location.name.length) % writingStyles.length;
 
+  const localContext = await getOrFetchLocalContext(location, settings.googleMapsKey);
+  const keywordPhrases = buildKeywordPhrases(service.name, location.city, location.state);
+
   const content = await provider.generatePageContent({
     serviceName: service.name,
     locationName: location.name,
@@ -119,6 +125,8 @@ async function executeGeneration(
     businessAddress: settings.businessAddress || "",
     writingStyle: writingStyles[styleIndex],
     minServiceNameMentions: Math.max(resolvedTrustLinks.length, 3),
+    localContext,
+    keywordPhrases,
   });
 
   // Duplicate content check — compare against existing pages for same service
@@ -233,4 +241,56 @@ async function executeGeneration(
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Returns cached local context for a location, or fetches fresh from Google
+ * Places if the cache is missing or older than 30 days. Errors are swallowed
+ * so generation always proceeds even if the Places API is down.
+ */
+async function getOrFetchLocalContext(
+  location: {
+    id: string;
+    city: string;
+    state: string;
+    lat: number | null;
+    lng: number | null;
+    localContextJson: string | null;
+    localContextAt: Date | null;
+  },
+  googleMapsKey: string | null,
+): Promise<LocalContext | undefined> {
+  // Use cache if fresh
+  if (location.localContextJson && location.localContextAt) {
+    const ageDays = (Date.now() - location.localContextAt.getTime()) / (1000 * 60 * 60 * 24);
+    if (ageDays < LOCAL_CONTEXT_TTL_DAYS) {
+      try {
+        return JSON.parse(location.localContextJson) as LocalContext;
+      } catch {
+        // fall through to refetch
+      }
+    }
+  }
+
+  // No key = no fetch; AI will fall back to generic content
+  if (!googleMapsKey) return undefined;
+
+  const ctx = await fetchLocalContext(
+    location.city,
+    location.state,
+    googleMapsKey,
+    location.lat,
+    location.lng,
+  );
+
+  // Cache for next time
+  await prisma.location.update({
+    where: { id: location.id },
+    data: {
+      localContextJson: JSON.stringify(ctx),
+      localContextAt: new Date(),
+    },
+  });
+
+  return ctx;
 }

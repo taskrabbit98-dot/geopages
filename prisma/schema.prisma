@@ -42,17 +42,19 @@ model Service {
 }
 
 model Location {
-  id        String          @id @default(cuid())
-  shop      String
-  name      String
-  slug      String
-  city      String
-  state     String
-  zip       String?
-  lat       Float?
-  lng       Float?
-  pages     GeneratedPage[]
-  createdAt DateTime        @default(now())
+  id                String          @id @default(cuid())
+  shop              String
+  name              String
+  slug              String
+  city              String
+  state             String
+  zip               String?
+  lat               Float?
+  lng               Float?
+  localContextJson  String?
+  localContextAt    DateTime?
+  pages             GeneratedPage[]
+  createdAt         DateTime        @default(now())
 
   @@unique([shop, slug])
 }
