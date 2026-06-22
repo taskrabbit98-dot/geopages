@@ -71,14 +71,27 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (intent === "subscribe") {
     const appUrl = process.env.SHOPIFY_APP_URL ?? "https://geopages.fly.dev";
-    await getOrCreateSubscriptionRecord(shop);
-    const result = await createSubscription(admin, shop, appUrl);
-    if ("error" in result) {
-      return json({ error: result.error }, { status: 500 });
+    try {
+      await getOrCreateSubscriptionRecord(shop);
+      const result = await createSubscription(admin, shop, appUrl);
+      if ("error" in result) {
+        console.error("[billing] createSubscription returned error:", result.error);
+        return json({ error: result.error }, { status: 500 });
+      }
+      // Redirect the merchant to Shopify's confirmation URL (outside the iframe).
+      return json({ confirmationUrl: result.confirmationUrl });
+    } catch (err) {
+      const e = err as { message?: string; body?: unknown; graphQLErrors?: unknown };
+      console.error("[billing] subscribe threw:", {
+        message: e?.message,
+        graphQLErrors: JSON.stringify(e?.graphQLErrors),
+        body: JSON.stringify(e?.body),
+      });
+      return json(
+        { error: `Subscribe failed: ${e?.message ?? "unknown error"}` },
+        { status: 500 },
+      );
     }
-    // Redirect the merchant to Shopify's confirmation URL (outside the iframe).
-    // We return JSON with the URL so the client can do window.top.location.assign().
-    return json({ confirmationUrl: result.confirmationUrl });
   }
 
   if (intent === "cancel") {
