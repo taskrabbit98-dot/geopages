@@ -81,12 +81,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       // Redirect the merchant to Shopify's confirmation URL (outside the iframe).
       return json({ confirmationUrl: result.confirmationUrl });
     } catch (err) {
-      const e = err as { message?: string; body?: unknown; graphQLErrors?: unknown };
-      console.error("[billing] subscribe threw:", {
-        message: e?.message,
-        graphQLErrors: JSON.stringify(e?.graphQLErrors),
-        body: JSON.stringify(e?.body),
-      });
+      const e = err as { message?: string };
+      console.error("[billing] subscribe threw:", e?.message ?? err);
       return json(
         { error: `Subscribe failed: ${e?.message ?? "unknown error"}` },
         { status: 500 },
