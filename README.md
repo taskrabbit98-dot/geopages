@@ -1,259 +1,134 @@
-# Shopify Programmatic SEO App
+# geopages
 
-Generate hundreds of unique, SEO-optimized **service × location** pages for your Shopify store — the same strategy used by Thumbtack, Yelp, and Tripadvisor at scale.
+A Shopify app that generates AI-written local SEO landing pages for service businesses — one page per **service × location** combination, served on the merchant's storefront via Shopify App Proxy.
 
-## What It Does
+**Live:** https://geopages.fly.dev
 
-Each unique combination of a **service** (e.g., "Roof Repair") and a **location** (e.g., "Miami, FL") becomes its own real, Google-indexable Shopify page at `/pages/roof-repair-miami-fl`.
+## What it does
 
-Every page includes:
-- AI-generated, unique content (OpenAI GPT-4o or Gemini 1.5 Pro)
-- Schema.org JSON-LD (LocalBusiness + Service + FAQPage)
-- 5-question FAQ section
-- Google Maps embed
-- External directory links (Yelp, BBB, Angi, etc.)
-- Internal cross-links to related location pages
-- Content quality score (0–100)
-- Duplicate content detection (Jaccard similarity)
+A merchant adds their services (e.g., "Roof Repair", "Gutter Cleaning") and locations (e.g., "Miami, FL", "Tampa, FL"). The app generates a unique landing page for every combination at a URL like:
 
----
+```
+https://merchantstore.myshopify.com/apps/service-areas/roof-repair-miami-fl
+```
 
-## Tech Stack
+Each page is built with:
 
-| Layer | Technology |
+- AI-written content (OpenAI GPT-4o, two-pass for higher per-page uniqueness)
+- Real local data from Google Places (neighborhoods, landmarks, ZIPs) fed into the prompt
+- Long-tail keyword variants for topical coverage
+- Inline trust-link anchors on the service name (Yelp/BBB/Google Maps search URLs templated per location)
+- LocalBusiness + FAQPage JSON-LD structured data
+- 5-question FAQ rendered as an accordion
+- Optional Google Maps embed and Unsplash/DALL-E featured image
+- Mobile-responsive layout wrapped by the merchant's active Shopify theme
+
+Pages live in the app database (not Shopify's Pages tab), so a merchant with 500+ pages doesn't drown the native Pages admin.
+
+## Architecture
+
+```
+GitHub (taskrabbit98-dot/geopages, main)
+        │  push triggers fly deploy
+        ▼
+Fly.io: geopages
+  │
+  ├── App service (Remix server, 2 machines, iad)
+  │       │
+  │       └── Public URL: https://geopages.fly.dev
+  │
+  └── Postgres: shopify-pseo-app-db.flycast
+          (shared cluster, internal hostname)
+```
+
+Generated pages are served dynamically via Shopify App Proxy: `{shop}/apps/service-areas/{slug}` proxies to `https://geopages.fly.dev/apps/service-areas/{slug}` which renders from the Postgres `GeneratedPage` table and returns `application/liquid` so Shopify wraps the response with the merchant's theme.
+
+## Tech stack
+
+| Layer | Tech |
 |---|---|
-| Frontend | Remix + React + Shopify Polaris |
-| Backend | Node.js (Remix loaders/actions) |
-| Database | SQLite (dev) / PostgreSQL (prod) via Prisma |
-| AI | OpenAI GPT-4o / Google Gemini 1.5 Pro |
-| Images | DALL-E 3 / Unsplash API |
-| Maps | Google Maps Embed API |
-| Shopify | Pages API (GraphQL Admin API) |
+| Framework | Remix v2 (file-based routes, SSR) |
+| UI | Shopify Polaris v13 + App Bridge React |
+| Auth | `@shopify/shopify-app-remix` v3 (embedded auth) |
+| Database | PostgreSQL via Prisma 5 |
+| AI | OpenAI GPT-4o + `@google/generative-ai` (Gemini fallback) |
+| Local data | Google Geocoding + Places Nearby Search |
+| HTML sanitization | DOMPurify + jsdom |
+| Hosting | Fly.io (multi-machine, auto-stop) |
+| Billing | Shopify Billing API (`appSubscriptionCreate`) |
+| Node | 18.20.8 |
 
----
+## Routes
 
-## Setup
+| Path | Purpose |
+|---|---|
+| `/` | Public landing — redirects to `/app` when accessed with `?shop=` |
+| `/auth/login` | Starts OAuth install |
+| `/auth/*` | OAuth callback handlers |
+| `/app` | Embedded admin Dashboard |
+| `/app/services` | Manage Service records |
+| `/app/locations` | Manage Location records |
+| `/app/generate` | Service × Location matrix — bulk generate + delete |
+| `/app/pages/:id` | Per-page editor (save, publish, regenerate sections, delete) |
+| `/app/bulk` | Bulk regenerate sections, refresh trust links, bulk delete |
+| `/app/menu` | Storefront menu builder (3-level nested dropdowns) |
+| `/app/billing` | Subscription management |
+| `/app/settings` | Business info, AI keys, trust link templates |
+| `/apps/service-areas/:slug` | Public page served via App Proxy |
+| `/apps/service-areas/sitemap.xml` | Sitemap for Google Search Console |
 
-### 1. Prerequisites
+## Data model
 
-- Node.js ≥ 18.20.0
-- A Shopify Partner account
-- A development store
+See [`prisma/schema.prisma`](prisma/schema.prisma) for the full schema. Key tables:
 
-### 2. Create the app in your Partner Dashboard
+- `Service` — name, slug per shop
+- `Location` — city/state/zip/lat/lng + cached `localContextJson` from Google Places
+- `GeneratedPage` — full assembled HTML, SEO fields, status (draft/published/archived), quality score
+- `TrustLinkTemplate` — shop-wide URL templates with `{service}`, `{city}`, `{state}` placeholders
+- `Subscription` — Shopify Billing state per shop
+- `Session` — Shopify OAuth session storage
+- `GenerationJob` — in-memory queue records (pending/running/done/failed)
 
-1. Go to [partners.shopify.com](https://partners.shopify.com) → Apps → Create app
-2. Choose **Custom app** or **Public app**
-3. Copy your **API key** and **API secret**
-
-### 3. Clone & install
+## Local development
 
 ```bash
-git clone <your-repo>
+git clone https://github.com/taskrabbit98-dot/geopages.git
 cd geopages
 npm install
-```
-
-### 4. Configure environment variables
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env`:
-
-```env
-SHOPIFY_API_KEY=your_api_key_here
-SHOPIFY_API_SECRET=your_api_secret_here
-SHOPIFY_APP_URL=https://your-tunnel-url.trycloudflare.com
-SCOPES=write_content,read_content,write_metaobjects,read_metaobjects
-DATABASE_URL="file:./prisma/dev.db"
-
-OPENAI_API_KEY=sk-...
-GEMINI_API_KEY=              # optional
-GOOGLE_MAPS_API_KEY=         # optional
-UNSPLASH_ACCESS_KEY=         # optional
-```
-
-### 5. Update shopify.app.toml
-
-Replace `YOUR_SHOPIFY_API_KEY` and `YOUR_APP_URL` in `shopify.app.toml`.
-
-### 6. Initialize the database
-
-```bash
-npx prisma migrate dev --name init
-```
-
-### 7. Run in development
-
-```bash
+cp .env.example .env  # then fill in Shopify keys, OpenAI, etc.
+npm run prisma:migrate
 npm run dev
 ```
 
-This uses Shopify CLI to start the dev server with a Cloudflare tunnel automatically.
+`npm run dev` runs `shopify app dev` which sets up a Cloudflare tunnel and registers the URLs with the Partner Dashboard automatically.
 
----
+## Deployment
 
-## Deploying to Production
-
-### Option A — Fly.io (recommended)
+Pushes to `main` auto-deploy to Fly via `flyctl deploy`. To deploy manually:
 
 ```bash
-# Install Fly CLI
-curl -L https://fly.io/install.sh | sh
-
-# Create the app
-fly launch
-
-# Set secrets
-fly secrets set SHOPIFY_API_KEY=... SHOPIFY_API_SECRET=... DATABASE_URL=...
-
-# Deploy
-fly deploy
+flyctl deploy --app geopages
 ```
 
-### Option B — Railway
+Secrets are managed with:
 
-1. Push to GitHub
-2. Connect Railway to the repo
-3. Add environment variables in the Railway dashboard
-4. Railway auto-detects Node.js and deploys
-
-### Switching to PostgreSQL for production
-
-Change `DATABASE_URL` to a Postgres connection string and update `prisma/schema.prisma`:
-
-```prisma
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
+```bash
+flyctl secrets list --app geopages
+flyctl secrets set KEY=value --app geopages
 ```
 
-Then run: `npx prisma migrate deploy`
+The `release_command` in `fly.toml` runs `npx prisma migrate deploy` before each release, so schema changes ship safely.
 
----
+## Billing
 
-## App Scopes Required
+The app uses Shopify's Billing API for a $30/month subscription with a 3-day free trial. New installs see a "Subscribe to start generating pages" gate on the `/app/billing` page. Test mode is auto-detected via `shop.plan.partnerDevelopment` so development stores aren't charged.
 
-```
-write_content
-read_content
-write_metaobjects
-read_metaobjects
-```
+See [`app/lib/billing/index.ts`](app/lib/billing/index.ts) for the full flow.
 
----
+## SEO disclaimer
 
-## Google Search Console Setup
+Programmatic SEO at scale is risky in 2025+. Google's spam policies target "scaled content abuse" and "doorway pages." The app uses several mitigations (two-pass generation, real local data injection, banned filler phrases, per-page outline), but no app can guarantee organic rankings. Validate empirically: generate pages for a real business, submit the sitemap to Google Search Console, wait 4-8 weeks, and measure indexation + impressions before scaling.
 
-After publishing pages:
+## License
 
-1. In the app Dashboard, copy your **Sitemap URL**: `https://your-store.myshopify.com/apps/pseo/sitemap.xml`
-2. Go to [Google Search Console](https://search.google.com/search-console)
-3. Select your property → Sitemaps → Submit the URL
-4. Monitor indexing coverage over the next 2–4 weeks
-
-**Important:** Verify your Shopify theme's `robots.txt` does NOT block `/pages/`:
-- Shopify Admin → Online Store → Themes → Edit code → `robots.txt.liquid`
-- The default Shopify robots.txt allows `/pages/`
-
----
-
-## Page Generation Strategy
-
-The app uses **Option C (Hybrid)**:
-
-- Service and location data is stored in the local database
-- Content is generated by AI (GPT-4o or Gemini)
-- Real Shopify Pages are created via the GraphQL Admin API
-- Pages are served from Shopify's CDN at `/pages/{slug}` — fully crawlable
-
-### Avoiding duplicate content
-
-- Each page uses a **writing style seed** (formal / conversational / direct) that rotates by service+location hash
-- After generation, **Jaccard similarity** (>70% word-set overlap) triggers a rejection and retry
-- The AI prompt explicitly instructs varied phrasing and location-specific context
-
----
-
-## File Structure
-
-```
-/app
-  /routes
-    app._index.tsx           Dashboard
-    app.services.tsx         Services + directory links manager
-    app.locations.tsx        Locations manager + CSV import
-    app.generate.tsx         Matrix page generator
-    app.pages.$id.tsx        Page editor + publish controls
-    app.settings.tsx         API keys + business info
-    app.sitemap[.xml].tsx    Sitemap via App Proxy
-    app.tsx                  Shopify app shell (Polaris + Nav)
-    auth.$.tsx               Auth handler
-    _index.tsx               Login page
-  /lib
-    /ai
-      provider.ts            AIProvider interface + prompt builder
-      openai.ts              OpenAI GPT-4o implementation
-      gemini.ts              Google Gemini implementation
-      index.ts               Factory + exports
-    /content
-      generator.ts           HTML assembler + quality scorer
-      similarity.ts          Jaccard duplicate detection
-      schema.ts              schema.org JSON-LD builder
-    /queue
-      jobs.ts                In-memory generation queue
-    /shopify
-      pages.ts               Shopify Pages API wrapper
-      maps.ts                Google Maps URL builder
-      images.ts              Image resolver (upload/DALL-E/Unsplash)
-  db.server.ts               Prisma client singleton
-  shopify.server.ts          Shopify app auth config
-  root.tsx                   Remix root
-/prisma
-  schema.prisma              Database schema
-```
-
----
-
-## Delivery Checklist
-
-- [x] Shopify OAuth install flow (via `@shopify/shopify-app-remix`)
-- [x] Services CRUD (with directory links, min-5 warning)
-- [x] Locations CRUD (including CSV bulk import)
-- [x] Matrix view generator (service × location grid)
-- [x] Single page generation (OpenAI + Gemini paths)
-- [x] Generated HTML includes all 10 SEO requirements
-- [x] Schema.org JSON-LD (LocalBusiness + Service + FAQPage)
-- [x] Shopify Page created via GraphQL Admin API
-- [x] Sitemap endpoint at `/apps/pseo/sitemap.xml`
-- [x] Duplicate content detection (Jaccard similarity, >70% threshold)
-- [x] API keys stored encrypted at rest (via `@shopify/shopify-app-session-storage-prisma`)
-- [x] Content quality score (0–100)
-- [x] Image strategy: user-uploaded → DALL-E → Unsplash
-- [x] Google Maps embed (with API key fallback)
-- [x] Internal cross-linking to same-service, other-location pages
-- [x] Mobile-friendly (Polaris is responsive)
-
----
-
-## Open Questions (Asked on First Launch)
-
-The Settings page prompts for:
-
-1. Business name, phone, address (NAP data)
-2. AI provider preference (OpenAI / Gemini)
-3. Image strategy (DALL-E / Unsplash / none)
-4. Google Maps API key
-5. Number of services and locations
-
----
-
-## Security Notes
-
-- API keys are stored in the database and never exposed to the client
-- AI-generated HTML is sanitized with **DOMPurify** before being stored or sent to Shopify
-- All Shopify API calls go through the authenticated `admin` GraphQL client (OAuth session-bound)
-- External directory link URLs are user-controlled — validate them in the UI before saving
+Private.
