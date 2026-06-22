@@ -51,20 +51,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (intent === "create") {
     const city = (formData.get("city") as string).trim();
     const state = (formData.get("state") as string).trim();
+    const country = ((formData.get("country") as string) || "US").trim().toUpperCase();
     const zip = (formData.get("zip") as string | null)?.trim() || null;
     const lat = formData.get("lat") ? Number(formData.get("lat")) : null;
     const lng = formData.get("lng") ? Number(formData.get("lng")) : null;
 
-    if (!city || !state) return json({ error: "City and state are required" }, { status: 400 });
+    if (!city || !state) return json({ error: "City and state/region are required" }, { status: 400 });
 
     const name = `${city}, ${state}`;
-    const slug = slugify(`${city}-${state}`);
+    const slug = slugify(`${city}-${state}-${country}`);
 
     const existing = await prisma.location.findFirst({ where: { shop, slug } });
     if (existing) return json({ error: "Location already exists" }, { status: 400 });
 
     const location = await prisma.location.create({
-      data: { shop, name, slug, city, state, zip, lat, lng },
+      data: { shop, name, slug, city, state, country, zip, lat, lng },
     });
     return json({ success: true, location });
   }
@@ -73,7 +74,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const csvData = formData.get("csvData") as string;
     if (!csvData) return json({ error: "No CSV data" }, { status: 400 });
 
-    const parsed = Papa.parse<{ city: string; state: string; zip?: string; lat?: string; lng?: string }>(
+    const parsed = Papa.parse<{ city: string; state: string; country?: string; zip?: string; lat?: string; lng?: string }>(
       csvData,
       { header: true, skipEmptyLines: true }
     );
@@ -85,22 +86,66 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     for (const row of parsed.data) {
       const city = row.city?.trim();
       const state = row.state?.trim();
+      const country = (row.country?.trim() || "US").toUpperCase();
       if (!city || !state) { skipped++; continue; }
 
       const name = `${city}, ${state}`;
-      const slug = slugify(`${city}-${state}`);
+      const slug = slugify(`${city}-${state}-${country}`);
       const lat = row.lat ? Number(row.lat) : null;
       const lng = row.lng ? Number(row.lng) : null;
 
       try {
         await prisma.location.upsert({
           where: { shop_slug: { shop, slug } },
-          create: { shop, name, slug, city, state, zip: row.zip?.trim() || null, lat, lng },
+          create: { shop, name, slug, city, state, country, zip: row.zip?.trim() || null, lat, lng },
           update: {},
         });
         created++;
       } catch (e) {
         errors.push(`${city}, ${state}: ${e instanceof Error ? e.message : String(e)}`);
+        skipped++;
+      }
+    }
+
+    return json({ success: true, created, skipped, errors });
+  }
+
+  if (intent === "bulk-paste") {
+    const raw = (formData.get("lines") as string) || "";
+    const defaultCountry = ((formData.get("defaultCountry") as string) || "US").toUpperCase();
+
+    const lines = raw
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    let created = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+
+    for (const line of lines) {
+      // Accepts "City, State" or "City, State, Country"
+      const parts = line.split(",").map((p) => p.trim()).filter(Boolean);
+      if (parts.length < 2) {
+        skipped++;
+        errors.push(`"${line}" — must be at least "City, State"`);
+        continue;
+      }
+      const city = parts[0];
+      const state = parts[1];
+      const country = (parts[2] || defaultCountry).toUpperCase();
+
+      const name = `${city}, ${state}`;
+      const slug = slugify(`${city}-${state}-${country}`);
+      try {
+        await prisma.location.upsert({
+          where: { shop_slug: { shop, slug } },
+          create: { shop, name, slug, city, state, country },
+          update: {},
+        });
+        created++;
+      } catch (e) {
+        errors.push(`${line}: ${e instanceof Error ? e.message : String(e)}`);
         skipped++;
       }
     }
@@ -122,15 +167,28 @@ export default function Locations() {
   const fetcher = useFetcher<typeof action>();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
-  const [form, setForm] = useState({ city: "", state: "", zip: "", lat: "", lng: "" });
+  const [showBulkPasteModal, setShowBulkPasteModal] = useState(false);
+  const [form, setForm] = useState({ city: "", state: "", country: "US", zip: "", lat: "", lng: "" });
   const [csvPreview, setCsvPreview] = useState<{ city: string; state: string }[]>([]);
   const [csvRaw, setCsvRaw] = useState("");
+  const [bulkLines, setBulkLines] = useState("");
+  const [bulkCountry, setBulkCountry] = useState("US");
 
   const handleCreate = () => {
     if (!form.city.trim() || !form.state.trim()) return;
     fetcher.submit({ intent: "create", ...form }, { method: "POST" });
     setShowCreateModal(false);
-    setForm({ city: "", state: "", zip: "", lat: "", lng: "" });
+    setForm({ city: "", state: "", country: "US", zip: "", lat: "", lng: "" });
+  };
+
+  const handleBulkPaste = () => {
+    if (!bulkLines.trim()) return;
+    fetcher.submit(
+      { intent: "bulk-paste", lines: bulkLines, defaultCountry: bulkCountry },
+      { method: "POST" },
+    );
+    setShowBulkPasteModal(false);
+    setBulkLines("");
   };
 
   const handleCsvDrop = useCallback(
@@ -170,7 +228,10 @@ export default function Locations() {
     <Page
       title="Locations"
       primaryAction={{ content: "Add Location", onAction: () => setShowCreateModal(true) }}
-      secondaryActions={[{ content: "Bulk Import CSV", onAction: () => setShowImportModal(true) }]}
+      secondaryActions={[
+        { content: "Bulk paste", onAction: () => setShowBulkPasteModal(true) },
+        { content: "Bulk Import CSV", onAction: () => setShowImportModal(true) },
+      ]}
     >
       <BlockStack gap="400">
         {fetcher.data && "created" in fetcher.data && (
@@ -230,15 +291,51 @@ export default function Locations() {
         <Modal.Section>
           <FormLayout>
             <FormLayout.Group>
-              <TextField label="City" value={form.city} onChange={(v) => setForm((f) => ({ ...f, city: v }))} autoComplete="off" placeholder="Miami" />
-              <TextField label="State" value={form.state} onChange={(v) => setForm((f) => ({ ...f, state: v }))} autoComplete="off" placeholder="FL" />
+              <TextField label="City" value={form.city} onChange={(v) => setForm((f) => ({ ...f, city: v }))} autoComplete="off" placeholder="Lagos" />
+              <TextField label="State / Region" value={form.state} onChange={(v) => setForm((f) => ({ ...f, state: v }))} autoComplete="off" placeholder="LA" helpText="State abbreviation (US) or regional abbreviation" />
+              <TextField label="Country" value={form.country} onChange={(v) => setForm((f) => ({ ...f, country: v }))} autoComplete="off" placeholder="NG" helpText="ISO code (US, NG, GB, etc.)" />
             </FormLayout.Group>
             <FormLayout.Group>
-              <TextField label="ZIP (optional)" value={form.zip} onChange={(v) => setForm((f) => ({ ...f, zip: v }))} autoComplete="off" />
-              <TextField label="Latitude (optional)" value={form.lat} onChange={(v) => setForm((f) => ({ ...f, lat: v }))} autoComplete="off" placeholder="25.7617" />
-              <TextField label="Longitude (optional)" value={form.lng} onChange={(v) => setForm((f) => ({ ...f, lng: v }))} autoComplete="off" placeholder="-80.1918" />
+              <TextField label="ZIP / Postal (optional)" value={form.zip} onChange={(v) => setForm((f) => ({ ...f, zip: v }))} autoComplete="off" />
+              <TextField label="Latitude (optional)" value={form.lat} onChange={(v) => setForm((f) => ({ ...f, lat: v }))} autoComplete="off" placeholder="6.5244" />
+              <TextField label="Longitude (optional)" value={form.lng} onChange={(v) => setForm((f) => ({ ...f, lng: v }))} autoComplete="off" placeholder="3.3792" />
             </FormLayout.Group>
           </FormLayout>
+        </Modal.Section>
+      </Modal>
+
+      {/* Bulk Paste Modal */}
+      <Modal
+        open={showBulkPasteModal}
+        onClose={() => setShowBulkPasteModal(false)}
+        title="Bulk paste locations"
+        primaryAction={{ content: "Add all", onAction: handleBulkPaste, disabled: !bulkLines.trim() }}
+        secondaryActions={[{ content: "Cancel", onAction: () => setShowBulkPasteModal(false) }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="300">
+            <Text as="p" tone="subdued">
+              Paste one location per line in the format <code>City, State</code> or <code>City, State, Country</code>.
+              If country is omitted, the default below is used.
+            </Text>
+            <TextField
+              label="Default country"
+              value={bulkCountry}
+              onChange={setBulkCountry}
+              autoComplete="off"
+              placeholder="NG"
+              helpText="2-letter ISO country code (US, NG, GB, CA, AU, etc.)"
+            />
+            <TextField
+              label="Locations"
+              value={bulkLines}
+              onChange={setBulkLines}
+              autoComplete="off"
+              multiline={12}
+              placeholder={`Lagos, LA\nKano, KN\nIbadan, OY\nAbuja, FCT\nPort Harcourt, RI`}
+              helpText="One per line. Slugs auto-generated. Duplicates skipped."
+            />
+          </BlockStack>
         </Modal.Section>
       </Modal>
 

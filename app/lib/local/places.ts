@@ -39,6 +39,7 @@ export async function fetchLocalContext(
   apiKey: string | null,
   lat?: number | null,
   lng?: number | null,
+  country: string = "US",
 ): Promise<LocalContext> {
   const empty: LocalContext = {
     neighborhoods: [],
@@ -56,8 +57,13 @@ export async function fetchLocalContext(
     let county: string | undefined;
     let cityFullName = `${city}, ${state}`;
 
+    // Include country in the geocoding query — disambiguates "Lagos, LA" (US Louisiana
+    // vs. Nigeria Lagos) and improves results for non-US locations.
+    const geocodeQuery = country && country !== "US"
+      ? `${city}, ${state}, ${country}`
+      : `${city}, ${state}`;
     const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
-      `${city}, ${state}`,
+      geocodeQuery,
     )}&key=${apiKey}`;
     const geocodeResp = await fetch(geocodeUrl);
     const geocodeData = (await geocodeResp.json()) as {

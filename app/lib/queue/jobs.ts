@@ -253,6 +253,7 @@ async function getOrFetchLocalContext(
     id: string;
     city: string;
     state: string;
+    country?: string;
     lat: number | null;
     lng: number | null;
     localContextJson: string | null;
@@ -281,6 +282,7 @@ async function getOrFetchLocalContext(
     googleMapsKey,
     location.lat,
     location.lng,
+    location.country ?? "US",
   );
 
   // Cache for next time

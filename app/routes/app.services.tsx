@@ -63,6 +63,41 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return json({ success: true, service });
   }
 
+  if (intent === "bulk-create") {
+    const rawLines = (formData.get("names") as string) || "";
+    const names = rawLines
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    if (names.length === 0) return json({ error: "No service names provided" }, { status: 400 });
+
+    let created = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+
+    for (const name of names) {
+      const slug = slugify(name);
+      if (!slug) {
+        skipped++;
+        continue;
+      }
+      try {
+        await prisma.service.upsert({
+          where: { shop_slug: { shop, slug } },
+          create: { shop, name, slug },
+          update: {},
+        });
+        created++;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        errors.push(`${name}: ${msg}`);
+      }
+    }
+
+    return json({ success: true, created, skipped, errors });
+  }
+
   if (intent === "delete") {
     const id = formData.get("id") as string;
     await prisma.service.delete({ where: { id } });
@@ -76,8 +111,10 @@ export default function Services() {
   const { services } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
+  const [bulkNames, setBulkNames] = useState("");
 
   const handleCreate = () => {
     if (!newName.trim()) return;
@@ -90,12 +127,38 @@ export default function Services() {
     setNewDescription("");
   };
 
+  const handleBulkCreate = () => {
+    if (!bulkNames.trim()) return;
+    fetcher.submit({ intent: "bulk-create", names: bulkNames }, { method: "POST" });
+    setShowBulkModal(false);
+    setBulkNames("");
+  };
+
+  const bulkResult = fetcher.data as
+    | { success: boolean; created?: number; skipped?: number; errors?: string[] }
+    | undefined;
+
   return (
     <Page
       title="Services"
       primaryAction={{ content: "Add Service", onAction: () => setShowCreateModal(true) }}
+      secondaryActions={[
+        { content: "Bulk add", onAction: () => setShowBulkModal(true) },
+      ]}
     >
       <BlockStack gap="400">
+        {bulkResult && bulkResult.created != null && (
+          <Banner tone="success">
+            Added {bulkResult.created} service(s).
+            {bulkResult.skipped ? ` Skipped ${bulkResult.skipped} blank line(s).` : ""}
+            {bulkResult.errors && bulkResult.errors.length > 0 && (
+              <ul style={{ marginTop: 8, fontSize: 12 }}>
+                {bulkResult.errors.slice(0, 5).map((e, i) => <li key={i}>{e}</li>)}
+              </ul>
+            )}
+          </Banner>
+        )}
+
         <Banner tone="info">
           <p>
             Looking for <strong>Trust Links</strong>? They moved to{" "}
@@ -165,6 +228,31 @@ export default function Services() {
               placeholder="Describe this service — used as AI context for content generation."
             />
           </FormLayout>
+        </Modal.Section>
+      </Modal>
+
+      <Modal
+        open={showBulkModal}
+        onClose={() => setShowBulkModal(false)}
+        title="Bulk add services"
+        primaryAction={{ content: "Add all", onAction: handleBulkCreate, disabled: !bulkNames.trim() }}
+        secondaryActions={[{ content: "Cancel", onAction: () => setShowBulkModal(false) }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="300">
+            <Text as="p" tone="subdued">
+              Paste one service name per line. Duplicates (by slug) are skipped automatically.
+            </Text>
+            <TextField
+              label="Services"
+              value={bulkNames}
+              onChange={setBulkNames}
+              autoComplete="off"
+              multiline={10}
+              placeholder={`Roof Repair\nRoof Builder\nGutter Cleaning\nSiding Installation\nWindow Replacement`}
+              helpText="One per line. Slugs auto-generated."
+            />
+          </BlockStack>
         </Modal.Section>
       </Modal>
     </Page>
