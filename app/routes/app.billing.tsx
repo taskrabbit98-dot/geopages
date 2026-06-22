@@ -132,11 +132,6 @@ export default function Billing() {
     }
   };
 
-  // When subscribe returns a confirmationUrl, break out of the iframe and navigate
-  if (fetcherData?.confirmationUrl && typeof window !== "undefined") {
-    window.top!.location.assign(fetcherData.confirmationUrl);
-  }
-
   const statusBadge =
     subscription.status === "ACTIVE" ? (
       <Badge tone="success">Active</Badge>
@@ -162,6 +157,31 @@ export default function Billing() {
 
         {fetcherData?.error && (
           <Banner tone="critical">{fetcherData.error}</Banner>
+        )}
+
+        {fetcherData?.confirmationUrl && (
+          <Banner tone="success" title="One more step — approve on Shopify">
+            <p style={{ marginBottom: 12 }}>
+              Click the button below to open Shopify's approval screen. Approve the
+              ${plan.amount}/month subscription with a 3-day free trial.
+            </p>
+            <a
+              href={fetcherData.confirmationUrl}
+              target="_top"
+              rel="noopener noreferrer"
+              style={{
+                display: "inline-block",
+                padding: "10px 20px",
+                background: "#008060",
+                color: "white",
+                fontWeight: 600,
+                borderRadius: 6,
+                textDecoration: "none",
+              }}
+            >
+              Open Shopify approval →
+            </a>
+          </Banner>
         )}
 
         {!hasAccess && (

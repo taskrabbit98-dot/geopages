@@ -20,6 +20,15 @@ redirect_urls = [
 [webhooks]
 api_version = "2024-07"
 
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+  [webhooks.privacy_compliance]
+  customer_deletion_url = "https://geopages.fly.dev/webhooks/customers/redact"
+  customer_data_request_url = "https://geopages.fly.dev/webhooks/customers/data_request"
+  shop_deletion_url = "https://geopages.fly.dev/webhooks/shop/redact"
+
 [app_proxy]
 url = "https://geopages.fly.dev/apps/service-areas"
 subpath = "service-areas"
