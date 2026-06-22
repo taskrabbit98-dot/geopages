@@ -1,8 +1,8 @@
 {
-  "name": "shopify-pseo-app",
+  "name": "geopages",
   "private": true,
   "version": "1.0.0",
-  "description": "Shopify Programmatic SEO App",
+  "description": "Programmatic SEO app for local service businesses",
   "scripts": {
     "build": "prisma generate && remix vite:build",
     "dev": "shopify app dev",

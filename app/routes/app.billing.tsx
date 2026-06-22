@@ -70,7 +70,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const intent = formData.get("intent") as string;
 
   if (intent === "subscribe") {
-    const appUrl = process.env.SHOPIFY_APP_URL ?? "https://shopify-pseo-app.fly.dev";
+    const appUrl = process.env.SHOPIFY_APP_URL ?? "https://geopages.fly.dev";
     await getOrCreateSubscriptionRecord(shop);
     const result = await createSubscription(admin, shop, appUrl);
     if ("error" in result) {

@@ -50,7 +50,7 @@ Every page includes:
 
 ```bash
 git clone <your-repo>
-cd shopify-pseo-app
+cd geopages
 npm install
 ```
 

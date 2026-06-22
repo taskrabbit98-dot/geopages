@@ -313,7 +313,7 @@ export default function MenuPage() {
               <li>Open this URL in a new tab (replace YOURSTORE):</li>
               <li>
                 <code>
-                  https://shopify-pseo-app.fly.dev/auth/login?shop=YOURSTORE.myshopify.com
+                  https://geopages.fly.dev/auth/login?shop=YOURSTORE.myshopify.com
                 </code>
               </li>
               <li>Approve the new permissions on the Shopify install screen</li>
